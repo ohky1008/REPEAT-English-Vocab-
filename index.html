@@ -82,6 +82,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);-webkit-font-smoothing:antialiased;position:fixed;inset:0;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font-family:inherit}
 *{touch-action:manipulation}
+[hidden]{display:none !important}
 input,select,textarea{font-size:16px !important}
 .vw-top{display:flex;align-items:center;gap:10px}
 .back.vw{transition:background-color .28s ease}
@@ -1655,15 +1656,11 @@ function renderViewModal(root, m){
       if(e.cancelable) e.preventDefault();
       dy = Math.max(0, d);
       sheet.style.transform = 'translateY('+dy+'px)';
-      back.classList.remove('enter');
-      back.style.transition = 'none';
-      back.style.opacity = String(Math.max(0.2, 1 - dy/(sheet.offsetHeight*1.1)));
     }, {passive:false});
     function end(){
       if(!drag){ track=false; return; }
       drag = false; track = false;
       var v = dy / Math.max(1, Date.now()-t0);
-      back.style.transition = 'opacity .26s ease'; back.style.opacity = '';
       if(dy > sheet.offsetHeight*0.28 || v > 0.6){ dismiss(); }
       else { sheet.style.transition = 'transform .3s cubic-bezier(.22,.9,.3,1)'; sheet.style.transform = 'translateY(0)'; }
     }
@@ -2089,6 +2086,9 @@ async function verifyCode(){
   a.busy = true; a.msg = null; renderCodeStep();
   var res = await sb.auth.verifyOtp({ email: a.codeEmail, token: a.code, type: a.codeKind==='signup' ? 'signup' : 'email' });
   a.busy = false;
+  if(!res.error && a.mode==='signup' && res.data && res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length===0){
+    res = { error: { message: 'already registered' } };
+  }
   if(res.error){
     a.msg = translateAuthError(res.error.message);
     a.msgKind = 'no';
@@ -2106,6 +2106,9 @@ async function sendLoginCode(){
   if(a.stage==='code') renderCodeStep(); else renderLogin();
   var res = await sb.auth.signInWithOtp({ email: email, options:{ shouldCreateUser: true } });
   a.busy = false;
+  if(!res.error && a.mode==='signup' && res.data && res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length===0){
+    res = { error: { message: 'already registered' } };
+  }
   if(res.error){
     a.msg = translateAuthError(res.error.message); a.msgKind = 'no';
     if(a.stage==='code') renderCodeStep(); else renderLogin();
@@ -2144,6 +2147,9 @@ async function submitAuth(){
     res = await sb.auth.signInWithPassword({ email: email, password: a.pw });
   }
   a.busy = false;
+  if(!res.error && a.mode==='signup' && res.data && res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length===0){
+    res = { error: { message: 'already registered' } };
+  }
   if(res.error){
     a.msg = translateAuthError(res.error.message);
     a.msgKind = 'no';
