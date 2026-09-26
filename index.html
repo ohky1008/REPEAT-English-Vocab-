@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Repeat · 단어 오답노트</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -81,6 +81,16 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 *{scrollbar-width:none;-ms-overflow-style:none}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);-webkit-font-smoothing:antialiased;position:fixed;inset:0;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font-family:inherit}
+*{touch-action:manipulation}
+@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px !important}}
+.vw-top{display:flex;align-items:center;gap:10px}
+.vw-spk{flex:none;width:38px;height:38px;border-radius:50%;border:none;background:var(--mint-soft);color:var(--mint);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.vw-meta{font-size:12px;color:var(--muted);margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
+.vw-meta b{color:var(--ink);font-family:var(--f-mono);font-weight:600}
+.vw-acts{display:flex;gap:8px;margin-top:20px;align-items:center}
+.vw-acts .pbtn{margin:0;flex:1}
+.vw-acts .delbtn{padding:15px 18px;border-radius:13px}
+.vw-acts .confirm{flex:1}
 a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 ::selection{background:var(--mint-soft)}
 .app{max-width:520px;margin:0 auto;padding:0 0 84px;height:100%;display:flex;flex-direction:column;overflow:hidden}
@@ -877,7 +887,7 @@ function render(){
   document.getElementById('tabStudy').classList.toggle('on', state.tab==='study');
   document.getElementById('tabBank').classList.toggle('on', state.tab==='bank');
   if(state.tab==='study') renderStudyTab(); else renderBankTab();
-  var inCard = !!(state.session && state.session.idx < state.session.queue.length);
+  var inCard = state.tab==='study' && !!(state.session && state.session.idx < state.session.queue.length);
   view.classList.toggle('scrolly', !inCard);
   renderMenu();
   renderSheet();
@@ -1475,13 +1485,19 @@ function openAddModal(){
   render();
 }
 function openEditModal(id){
+  if(!Store.words.find(function(x){return x.id===id;})) return;
+  state.modal = { mode:'view', id:id };
+  state.deleteArmed = null;
+  render();
+}
+function startEdit(id){
   var w = Store.words.find(function(x){return x.id===id;});
   if(!w) return;
   var sa = splitSynAnt(w.synAnt);
   state.modal = {
     mode:'edit', id:id, word:w.word, pos:w.pos||'명사', meaning:w.meaning, example:w.example||'',
     syn: sa.syn, ant: sa.ant, listId: w.listId || Store.lists[0].id,
-    wrongCount: w.wrongCount||0, correctCount: w.correctCount||0
+    wrongCount: w.wrongCount||0, correctCount: w.correctCount||0, fromView:true
   };
   state.deleteArmed = null;
   render();
@@ -1492,6 +1508,7 @@ function renderModal(){
   var root = document.getElementById('modalRoot');
   var m = state.modal;
   if(!m){ root.innerHTML=''; return; }
+  if(m.mode==='view'){ renderViewModal(root, m); return; }
   var isEdit = m.mode==='edit';
 
   var html = '<div class="back" id="modalBack"><div class="sheet">'
@@ -1532,7 +1549,7 @@ function renderModal(){
   root.innerHTML = html;
 
   document.getElementById('modalBack').onclick = function(e){ if(e.target.id==='modalBack') closeModal(); };
-  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('cancelBtn').onclick = function(){ if(m.fromView){ state.modal={mode:'view',id:m.id}; state.deleteArmed=null; render(); } else closeModal(); };
   document.getElementById('fWord').oninput = function(e){ m.word = e.target.value; };
   document.getElementById('fMeaning').oninput = function(e){ m.meaning = e.target.value; };
   document.getElementById('fExample').oninput = function(e){ m.example = e.target.value; };
@@ -1557,8 +1574,7 @@ function renderModal(){
       synAnt: joinSynAnt(document.getElementById('fSyn').value, document.getElementById('fAnt').value),
       listId: document.getElementById('fList').value
     };
-    if(isEdit) Store.update(m.id, data); else Store.add(data);
-    closeModal();
+    if(isEdit){ Store.update(m.id, data); state.modal={mode:'view',id:m.id}; state.deleteArmed=null; render(); } else { Store.add(data); closeModal(); }
   };
   if(isEdit){
     document.getElementById('resetStatBtn').onclick = function(){
@@ -1571,6 +1587,40 @@ function renderModal(){
     } else {
       document.getElementById('askDelBtn').onclick = function(){ state.deleteArmed = m.id; render(); };
     }
+  }
+}
+
+function renderViewModal(root, m){
+  var w = Store.words.find(function(x){return x.id===m.id;});
+  if(!w){ state.modal=null; root.innerHTML=''; return; }
+  var sa = splitSynAnt(w.synAnt);
+  var spk = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+  var html = '<div class="back" id="modalBack"><div class="sheet"><div class="grab"></div>'
+    + '<div class="sheet-t"><span></span><button class="cancel" id="vwClose">닫기</button></div>'
+    + '<div class="vw-top"><div class="a-en" data-speak="'+escapeHtml(w.word)+'">'+escapeHtml(w.word)+'</div>'
+    + '<button class="vw-spk" data-speak="'+escapeHtml(w.word)+'" aria-label="발음 듣기">'+spk+'</button></div>'
+    + '<div class="a-ko">'+escapeHtml(w.meaning)+'</div>'
+    + '<div class="a-chips"><span class="pos '+posCls(w.pos)+'">'+escapeHtml(w.pos||'기타')+'</span></div>'
+    + ((w.example||sa.syn||sa.ant) ? '<div class="hr"></div>' : '')
+    + (w.example ? answerExampleHtml(w.example, w.word) : '')
+    + (sa.syn ? '<div class="sa syn"><b>동</b><span>'+escapeHtml(sa.syn)+'</span></div>' : '')
+    + (sa.ant ? '<div class="sa ant"><b>반</b><span>'+escapeHtml(sa.ant)+'</span></div>' : '')
+    + '<div class="vw-meta"><span>틀림 <b>'+(w.wrongCount||0)+'</b></span><span>정답 <b>'+(w.correctCount||0)+'</b></span><span>'+escapeHtml(listName(w.listId))+'</span></div>'
+    + '<div class="vw-acts">'
+    + (state.deleteArmed===w.id
+        ? '<div class="confirm">정말 삭제할까요? <button class="yes" id="vwDelYes">삭제</button><button class="no" id="vwDelNo">취소</button></div>'
+        : '<button class="delbtn" id="vwDel">삭제</button><button class="pbtn" id="vwEdit">수정</button>')
+    + '</div></div></div>';
+  root.innerHTML = html;
+  bindSpeakables(root);
+  document.getElementById('modalBack').onclick = function(e){ if(e.target.id==='modalBack') closeModal(); };
+  document.getElementById('vwClose').onclick = closeModal;
+  if(state.deleteArmed===w.id){
+    document.getElementById('vwDelYes').onclick = function(){ Store.remove(w.id); closeModal(); };
+    document.getElementById('vwDelNo').onclick = function(){ state.deleteArmed=null; render(); };
+  } else {
+    document.getElementById('vwDel').onclick = function(){ state.deleteArmed = w.id; render(); };
+    document.getElementById('vwEdit').onclick = function(){ startEdit(w.id); };
   }
 }
 
@@ -2092,6 +2142,7 @@ async function initAuth(){
 }
 
 /* ---------------- init ---------------- */
+['gesturestart','gesturechange'].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); }, {passive:false}); });
 document.getElementById('tabStudy').onclick = function(){ state.tab='study'; render(); };
 document.getElementById('tabBank').onclick = function(){ state.tab='bank'; render(); };
 Store.onChange(render);
