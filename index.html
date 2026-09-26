@@ -254,10 +254,10 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .lchip.on{background:var(--mint-soft);color:var(--ink);font-weight:700}
 .lchip .c{font-family:var(--f-mono);opacity:.6}
 .search-row{display:flex;gap:8px;padding:0 18px 12px}
-.search{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 12px;font-size:16px;color:var(--ink)}
+.search{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 12px;font-size:16px;color:var(--ink)}
 .search::placeholder{color:var(--faint)}
 .search:focus,.sel:focus,input:focus,textarea:focus{outline:2px solid var(--mint);outline-offset:1px}
-.sel{background:var(--surface);border:1px solid var(--line);border-radius:11px;color:var(--ink-2);font-size:12.5px;padding:10px}
+.sel{flex:none;max-width:40%;min-width:0;text-overflow:ellipsis;-webkit-appearance:none;appearance:none;padding-right:26px !important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238FA39A' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-color:var(--surface);border:1px solid var(--line);border-radius:11px;color:var(--ink-2);font-size:12.5px;padding:10px}
 .thead{display:flex;gap:10px;padding:0 20px 7px;font-family:var(--f-mono);font-size:10px;letter-spacing:.05em;color:#71877D}
 .thead .n{width:34px;text-align:center;flex:none}
 .wrow{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;border-top:1px solid var(--line-soft);padding:13px 20px;color:var(--ink);text-align:left;cursor:pointer}
@@ -882,6 +882,14 @@ function scopeFilteredWords(listId, scope){
   return base;
 }
 
+var lastRenderedTab = null;
+function switchTab(t){
+  var v = document.getElementById('view');
+  if(v){ v.style.overflowY='hidden'; v.scrollTop = 0; }
+  state.tab = t;
+  render();
+  requestAnimationFrame(function(){ if(v){ v.scrollTop = 0; v.style.overflowY=''; } });
+}
 function render(){
   renderSyncPill();
   document.getElementById('tabStudy').classList.toggle('on', state.tab==='study');
@@ -889,6 +897,7 @@ function render(){
   if(state.tab==='study') renderStudyTab(); else renderBankTab();
   var inCard = state.tab==='study' && !!(state.session && state.session.idx < state.session.queue.length);
   view.classList.toggle('scrolly', !inCard);
+  if(lastRenderedTab !== state.tab){ view.scrollTop = 0; lastRenderedTab = state.tab; }
   renderMenu();
   renderSheet();
   renderModal();
@@ -1016,14 +1025,14 @@ function renderStudyTab(){
     view.innerHTML = '<div class="empty"><h3>단어장을 먼저 만들어 주세요</h3>'
       + '<p>단어책 1권, 2권처럼 목록을 나눠 관리할 수 있어요.</p>'
       + '<button class="pbtn" id="goBankBtn">단어장 만들러 가기</button></div>';
-    document.getElementById('goBankBtn').onclick = function(){ state.tab='bank'; render(); };
+    document.getElementById('goBankBtn').onclick = function(){ switchTab('bank'); };
     return;
   }
   if(Store.words.length===0){
     view.innerHTML = '<div class="empty"><h3>아직 등록된 단어가 없어요</h3>'
       + '<p>단어장 탭에서 외우고 싶은 단어를 먼저 추가해 주세요.</p>'
       + '<button class="pbtn" id="goBankBtn">단어장으로 이동</button></div>';
-    document.getElementById('goBankBtn').onclick = function(){ state.tab='bank'; render(); };
+    document.getElementById('goBankBtn').onclick = function(){ switchTab('bank'); };
     return;
   }
 
@@ -1332,7 +1341,7 @@ function renderSummary(){
     };
   }
   document.getElementById('newBtn').onclick = function(){ state.session = null; render(); };
-  document.getElementById('toBankBtn').onclick = function(){ state.session = null; state.tab='bank'; render(); };
+  document.getElementById('toBankBtn').onclick = function(){ state.session = null; switchTab('bank'); };
 }
 
 /* ---------------- bank tab ---------------- */
@@ -2143,8 +2152,8 @@ async function initAuth(){
 
 /* ---------------- init ---------------- */
 ['gesturestart','gesturechange'].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); }, {passive:false}); });
-document.getElementById('tabStudy').onclick = function(){ state.tab='study'; render(); };
-document.getElementById('tabBank').onclick = function(){ state.tab='bank'; render(); };
+document.getElementById('tabStudy').onclick = function(){ switchTab('study'); };
+document.getElementById('tabBank').onclick = function(){ switchTab('bank'); };
 Store.onChange(render);
 initAuth();
 
