@@ -84,6 +84,13 @@ button,input,select,textarea{font-family:inherit}
 *{touch-action:manipulation}
 input,select,textarea{font-size:16px !important}
 .vw-top{display:flex;align-items:center;gap:10px}
+.back.vw{transition:background-color .28s ease}
+.back.vw.enter{animation:vwFade .28s ease both}
+.sheet.vw-sheet{height:67vh;height:67dvh;max-height:none;overscroll-behavior:contain;will-change:transform}
+.sheet.vw-sheet.enter{animation:vwUp .34s cubic-bezier(.22,.9,.3,1) both}
+@keyframes vwUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes vwFade{from{background-color:transparent}}
+@media (min-width:640px){.sheet.vw-sheet{height:auto;max-height:86vh}}
 .vw-spk{flex:none;width:38px;height:38px;border-radius:50%;border:none;background:var(--mint-soft);color:var(--mint);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .vw-meta{font-size:12px;color:var(--muted);margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
 .vw-meta b{color:var(--ink);font-family:var(--f-mono);font-weight:600}
@@ -1558,7 +1565,7 @@ function renderModal(){
   root.innerHTML = html;
 
   document.getElementById('modalBack').onclick = function(e){ if(e.target.id==='modalBack') closeModal(); };
-  document.getElementById('cancelBtn').onclick = function(){ if(m.fromView){ state.modal={mode:'view',id:m.id}; state.deleteArmed=null; render(); } else closeModal(); };
+  document.getElementById('cancelBtn').onclick = function(){ if(m.fromView){ state.modal={mode:'view',id:m.id,shown:true}; state.deleteArmed=null; render(); } else closeModal(); };
   document.getElementById('fWord').oninput = function(e){ m.word = e.target.value; };
   document.getElementById('fMeaning').oninput = function(e){ m.meaning = e.target.value; };
   document.getElementById('fExample').oninput = function(e){ m.example = e.target.value; };
@@ -1583,7 +1590,7 @@ function renderModal(){
       synAnt: joinSynAnt(document.getElementById('fSyn').value, document.getElementById('fAnt').value),
       listId: document.getElementById('fList').value
     };
-    if(isEdit){ Store.update(m.id, data); state.modal={mode:'view',id:m.id}; state.deleteArmed=null; render(); } else { Store.add(data); closeModal(); }
+    if(isEdit){ Store.update(m.id, data); state.modal={mode:'view',id:m.id,shown:true}; state.deleteArmed=null; render(); } else { Store.add(data); closeModal(); }
   };
   if(isEdit){
     document.getElementById('resetStatBtn').onclick = function(){
@@ -1604,7 +1611,8 @@ function renderViewModal(root, m){
   if(!w){ state.modal=null; root.innerHTML=''; return; }
   var sa = splitSynAnt(w.synAnt);
   var spk = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
-  var html = '<div class="back" id="modalBack"><div class="sheet"><div class="grab"></div>'
+  var enter = !m.shown; m.shown = true;
+  var html = '<div class="back vw'+(enter?' enter':'')+'" id="modalBack"><div class="sheet vw-sheet'+(enter?' enter':'')+'" id="vwSheet"><div class="grab"></div>'
     + '<div class="sheet-t"><span></span><button class="cancel" id="vwClose">닫기</button></div>'
     + '<div class="vw-top"><div class="a-en" data-speak="'+escapeHtml(w.word)+'">'+escapeHtml(w.word)+'</div>'
     + '<button class="vw-spk" data-speak="'+escapeHtml(w.word)+'" aria-label="발음 듣기">'+spk+'</button></div>'
@@ -1622,8 +1630,46 @@ function renderViewModal(root, m){
     + '</div></div></div>';
   root.innerHTML = html;
   bindSpeakables(root);
-  document.getElementById('modalBack').onclick = function(e){ if(e.target.id==='modalBack') closeModal(); };
-  document.getElementById('vwClose').onclick = closeModal;
+  var back = document.getElementById('modalBack'), sheet = document.getElementById('vwSheet');
+  function dismiss(){
+    if(sheet.dataset.closing) return; sheet.dataset.closing = '1';
+    sheet.classList.remove('enter'); back.classList.remove('enter');
+    sheet.style.transition = 'transform .26s cubic-bezier(.4,0,.8,.6)';
+    sheet.style.transform = 'translateY('+(sheet.offsetHeight+20)+'px)';
+    back.style.backgroundColor = 'transparent';
+    setTimeout(closeModal, 260);
+  }
+  back.onclick = function(e){ if(e.target.id==='modalBack') dismiss(); };
+  document.getElementById('vwClose').onclick = dismiss;
+  (function(){
+    var y0=0, t0=0, dy=0, drag=false, track=false;
+    sheet.addEventListener('touchstart', function(e){
+      if(sheet.dataset.closing) return;
+      y0 = e.touches[0].clientY; t0 = Date.now(); dy = 0; drag = false;
+      track = sheet.scrollTop <= 0;
+    }, {passive:true});
+    sheet.addEventListener('touchmove', function(e){
+      if(!track) return;
+      var d = e.touches[0].clientY - y0;
+      if(!drag){ if(d > 6){ drag = true; sheet.classList.remove('enter'); sheet.style.transition='none'; } else if(d < -6){ track=false; return; } else return; }
+      if(e.cancelable) e.preventDefault();
+      dy = Math.max(0, d);
+      sheet.style.transform = 'translateY('+dy+'px)';
+      back.classList.remove('enter');
+      back.style.transition = 'none';
+      back.style.opacity = String(Math.max(0.2, 1 - dy/(sheet.offsetHeight*1.1)));
+    }, {passive:false});
+    function end(){
+      if(!drag){ track=false; return; }
+      drag = false; track = false;
+      var v = dy / Math.max(1, Date.now()-t0);
+      back.style.transition = 'opacity .26s ease'; back.style.opacity = '';
+      if(dy > sheet.offsetHeight*0.28 || v > 0.6){ dismiss(); }
+      else { sheet.style.transition = 'transform .3s cubic-bezier(.22,.9,.3,1)'; sheet.style.transform = 'translateY(0)'; }
+    }
+    sheet.addEventListener('touchend', end);
+    sheet.addEventListener('touchcancel', end);
+  })();
   if(state.deleteArmed===w.id){
     document.getElementById('vwDelYes').onclick = function(){ Store.remove(w.id); closeModal(); };
     document.getElementById('vwDelNo').onclick = function(){ state.deleteArmed=null; render(); };
