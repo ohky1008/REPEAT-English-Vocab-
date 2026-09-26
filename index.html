@@ -1990,6 +1990,7 @@ function renderApp(){
 
 function renderLogin(){
   var root = document.getElementById('authScreen');
+  if(authState.session){ root.innerHTML=''; document.getElementById('appWrap').hidden=false; return; }
   var a = authState;
 
   if(!configOk){
@@ -2013,7 +2014,7 @@ function renderLogin(){
       + '<div class="pw-wrap"><input type="'+(a.showPw?'text':'password')+'" id="aPw" autocomplete="'+(isUp?'new-password':'current-password')+'" placeholder="••••••••" value="'+escapeHtml(a.pw)+'">'
       + '<button id="aPwToggle">'+(a.showPw?'숨기기':'보기')+'</button></div></div>'
     + (isUp ? '<div class="field"><label>비밀번호 다시 입력</label><input type="'+(a.showPw?'text':'password')+'" id="aPw2" autocomplete="new-password" placeholder="••••••••" value="'+escapeHtml(a.pw2)+'">'
-        + (a.pw2 ? '<div style="font-size:11.5px;margin-top:5px;color:'+(a.pw===a.pw2?'var(--mint)':'var(--danger)')+'">'+(a.pw===a.pw2?'일치 ✓':'비밀번호가 달라요')+'</div>' : '')
+        + '<div id="pwMatch" style="font-size:11.5px;margin-top:5px;min-height:1.2em"></div>'
         + '</div>' : '')
     + '</div>'
     + '<div class="keep"><label id="keepLabel"><span class="box'+(keepSignedIn()?' on':'')+'">'+(keepSignedIn()?'✓':'')+'</span>로그인 상태 유지</label>'
@@ -2031,7 +2032,10 @@ function renderLogin(){
   var emailEl = document.getElementById('aEmail'), pwEl = document.getElementById('aPw'), pw2El = document.getElementById('aPw2');
   emailEl.oninput = function(e){ a.email = e.target.value; };
   pwEl.oninput = function(e){ a.pw = e.target.value; };
-  if(pw2El) pw2El.oninput = function(e){ a.pw2 = e.target.value; renderLogin(); document.getElementById('aPw2').focus(); };
+  function paintMatch(){ var el=document.getElementById('pwMatch'); if(!el) return; if(!a.pw2){ el.textContent=''; return; } var ok=a.pw===a.pw2; el.textContent = ok?'일치 ✓':'비밀번호가 달라요'; el.style.color = ok?'var(--mint)':'var(--danger)'; }
+  paintMatch();
+  pwEl.addEventListener('input', paintMatch);
+  if(pw2El) pw2El.oninput = function(e){ a.pw2 = e.target.value; paintMatch(); };
   document.getElementById('aPwToggle').onclick = function(){ a.showPw = !a.showPw; renderLogin(); };
   document.getElementById('keepLabel').onclick = function(){
     setKeepSignedIn(!keepSignedIn());
@@ -2159,6 +2163,7 @@ async function submitAuth(){
     return renderCodeStep();
   } else {
     a.pw = ''; a.pw2 = '';
+    if(res.data && res.data.session){ authState.session = res.data.session; renderApp(); return; }
   }
   renderLogin();
 }
