@@ -82,7 +82,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);-webkit-font-smoothing:antialiased;position:fixed;inset:0;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font-family:inherit}
 *{touch-action:manipulation}
-@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px !important}}
+input,select,textarea{font-size:16px !important}
 .vw-top{display:flex;align-items:center;gap:10px}
 .vw-spk{flex:none;width:38px;height:38px;border-radius:50%;border:none;background:var(--mint-soft);color:var(--mint);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .vw-meta{font-size:12px;color:var(--muted);margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
@@ -254,7 +254,7 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .lchip.on{background:var(--mint-soft);color:var(--ink);font-weight:700}
 .lchip .c{font-family:var(--f-mono);opacity:.6}
 .search-row{display:flex;gap:8px;padding:0 18px 12px}
-.search{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--ink)}
+.search{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 12px;font-size:16px;color:var(--ink)}
 .search::placeholder{color:var(--faint)}
 .search:focus,.sel:focus,input:focus,textarea:focus{outline:2px solid var(--mint);outline-offset:1px}
 .sel{background:var(--surface);border:1px solid var(--line);border-radius:11px;color:var(--ink-2);font-size:12.5px;padding:10px}
