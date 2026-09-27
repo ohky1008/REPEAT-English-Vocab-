@@ -560,9 +560,64 @@ function pickVoice(){
   en.sort(function(a,b){ return rank(a)-rank(b); });
   return en[0];
 }
+var CLOUD_VOICES = [
+  {id:'en-US-Chirp3-HD-Aoede', name:'Aoede', desc:'여성 · 미국'},
+  {id:'en-US-Chirp3-HD-Kore', name:'Kore', desc:'여성 · 미국'},
+  {id:'en-US-Chirp3-HD-Leda', name:'Leda', desc:'여성 · 미국'},
+  {id:'en-US-Chirp3-HD-Puck', name:'Puck', desc:'남성 · 미국'},
+  {id:'en-US-Chirp3-HD-Charon', name:'Charon', desc:'남성 · 미국'},
+  {id:'en-US-Chirp3-HD-Fenrir', name:'Fenrir', desc:'남성 · 미국'},
+  {id:'en-GB-Chirp3-HD-Aoede', name:'Aoede', desc:'여성 · 영국'},
+  {id:'en-GB-Chirp3-HD-Puck', name:'Puck', desc:'남성 · 영국'}
+];
+var DEFAULT_CLOUD = 'cloud:en-US-Chirp3-HD-Aoede';
+function cloudVoiceId(){
+  var s = savedVoiceURI();
+  if(!s) return configOk ? DEFAULT_CLOUD.slice(6) : null;
+  return s.indexOf('cloud:')===0 ? s.slice(6) : null;
+}
+var ttsAudio = new Audio(); ttsAudio.preload = 'auto';
+var ttsUrlCache = {}, ttsReq = 0, ttsUnlocked = false;
+document.addEventListener('pointerdown', function(){
+  if(ttsUnlocked) return; ttsUnlocked = true;
+  try{
+    ttsAudio.muted = true; ttsAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+    var p = ttsAudio.play(); if(p && p.catch) p.catch(function(){});
+  }catch(e){}
+}, true);
+async function cloudUrl(text, voiceId){
+  var k = voiceId+'|'+text;
+  if(ttsUrlCache[k]) return ttsUrlCache[k];
+  var res = await sb.functions.invoke('smart-processor', { body: { text: text, voice: voiceId } });
+  if(res.error || !res.data || !res.data.url) throw new Error((res.data && res.data.error) || (res.error && res.error.message) || 'tts failed');
+  ttsUrlCache[k] = res.data.url;
+  return res.data.url;
+}
+function speakCloud(text, voiceId){
+  var my = ++ttsReq;
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+  try{ ttsAudio.pause(); }catch(e){}
+  cloudUrl(text, voiceId).then(function(url){
+    if(my !== ttsReq) return;
+    ttsAudio.muted = false; ttsAudio.src = url;
+    var p = ttsAudio.play();
+    if(p && p.catch) p.catch(function(){ if(my===ttsReq) speakLocal(text); });
+  }).catch(function(err){
+    console.warn('cloud tts', err);
+    if(my === ttsReq) speakLocal(text);
+  });
+}
 function speak(text, voiceOverride){
+  if(!text) return;
+  var cv = typeof voiceOverride === 'string' ? voiceOverride : (voiceOverride ? null : cloudVoiceId());
+  if(cv && sb){ speakCloud(text, cv); return; }
+  speakLocal(text, voiceOverride);
+}
+function speakLocal(text, voiceOverride){
   if(!text || !('speechSynthesis' in window)) return;
+  ttsReq++; try{ ttsAudio.pause(); }catch(e){}
   window.speechSynthesis.cancel();
+  if(typeof voiceOverride==='string') voiceOverride = null;
   var utter = new SpeechSynthesisUtterance(text);
   var voice = voiceOverride || pickVoice();
   if(voice){ utter.voice = voice; utter.lang = voice.lang; } else { utter.lang = 'en-US'; }
@@ -2028,12 +2083,22 @@ function renderVoiceModal(){
   var root = document.getElementById('voiceModalRoot');
   if(!state.voiceModal){ root.innerHTML=''; return; }
   var current = pickVoice();
-  var currentURI = current ? current.voiceURI : '';
+  var cloudCur = cloudVoiceId();
+  var currentURI = cloudCur ? '' : (current ? current.voiceURI : '');
   var en = ttsVoices.filter(function(v){ return v.lang && v.lang.toLowerCase().indexOf('en')===0; });
 
   var html = '<div class="back" id="voiceBack"><div class="sheet"><div class="grab"></div>'
     + '<div class="sheet-t"><h3>발음 음성 설정</h3><button class="cancel" id="voiceCloseBtn">닫기</button></div>'
     + '<div class="hintbox">방금 새 음성을 설치했다면 목록에 바로 안 보일 수 있어요. "목록 새로고침"을 눌러보시고, 그래도 안 보이면 브라우저를 껐다 켜주세요. Windows 자연스러운 음성은 Edge에서 가장 잘 인식돼요.</div>'
+    + '<div class="row-k" style="margin:4px 0 8px;font-weight:700">고품질 온라인 음성 <small style="font-weight:400;color:var(--muted)">Google · 인터넷 필요</small></div>'
+    + '<div class="vlist" style="margin-bottom:16px">' + CLOUD_VOICES.map(function(c){
+        var uri = 'cloud:'+c.id, isCur = (cloudCur===c.id);
+        return '<div class="vitem'+(isCur?' on':'')+'">'
+          + '<div class="nm"><div class="n">'+c.name+'</div><div class="l">'+c.desc+'</div></div>'
+          + '<button class="test" data-uri="'+uri+'">▶</button>'
+          + '<button class="pick'+(isCur?' on':'')+'" data-uri="'+uri+'">'+(isCur?'사용 중':'선택')+'</button></div>';
+      }).join('') + '</div>'
+    + '<div class="row-k" style="margin:4px 0 8px;font-weight:700">기기 음성 <small style="font-weight:400;color:var(--muted)">오프라인</small></div>'
     + '<button class="sbtn" style="margin:0 0 12px" id="refreshVoicesBtn">↻ 목록 새로고침</button>';
 
   if(en.length===0){
@@ -2056,8 +2121,10 @@ function renderVoiceModal(){
   document.getElementById('refreshVoicesBtn').onclick = function(){ refreshVoices(); render(); };
   root.querySelectorAll('.vitem .test').forEach(function(btn){
     btn.onclick = function(){
-      var v = ttsVoices.find(function(x){ return x.voiceURI===btn.dataset.uri; });
-      speak('This is a preview of this voice.', v);
+      var u = btn.dataset.uri;
+      if(u.indexOf('cloud:')===0){ speak('This is a preview of this voice.', u.slice(6)); return; }
+      var v = ttsVoices.find(function(x){ return x.voiceURI===u; });
+      speakLocal('This is a preview of this voice.', v);
     };
   });
   root.querySelectorAll('.vitem .pick').forEach(function(btn){
