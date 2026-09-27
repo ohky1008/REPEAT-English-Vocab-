@@ -585,6 +585,38 @@ document.addEventListener('pointerdown', function(){
     var p = ttsAudio.play(); if(p && p.catch) p.catch(function(){});
   }catch(e){}
 }, true);
+var ttsBlobUrl = {}, ttsPending = {};
+function ttsNorm(t){ return String(t||'').trim().slice(0,400); }
+async function ttsHash(s){
+  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+function loadCloud(text, voiceId){
+  var k = voiceId+'|'+ttsNorm(text);
+  if(ttsBlobUrl[k]) return Promise.resolve(ttsBlobUrl[k]);
+  if(ttsPending[k]) return ttsPending[k];
+  var p = (async function(){
+    var pub = CFG.SUPABASE_URL.replace(/\/$/,'')+'/storage/v1/object/public/tts/'+(await ttsHash(k))+'.mp3';
+    var blob = null, cache = null;
+    try{ if(window.caches){ cache = await caches.open('repeat-tts-v1'); var hit = await cache.match(pub); if(hit) blob = await hit.blob(); } }catch(e){}
+    if(!blob){ try{ var r = await fetch(pub); if(r.ok) blob = await r.blob(); }catch(e){} }
+    if(!blob){ var r2 = await fetch(await cloudUrl(ttsNorm(text), voiceId)); if(!r2.ok) throw new Error('audio '+r2.status); blob = await r2.blob(); }
+    blob = new Blob([blob], { type:'audio/mpeg' });
+    try{ if(cache) await cache.put(pub, new Response(blob, { headers:{ 'Content-Type':'audio/mpeg' } })); }catch(e){}
+    return (ttsBlobUrl[k] = URL.createObjectURL(blob));
+  })();
+  ttsPending[k] = p;
+  p.then(function(){ delete ttsPending[k]; }, function(){ delete ttsPending[k]; });
+  return p;
+}
+function prefetchTts(texts){
+  var cv = cloudVoiceId(); if(!cv || !sb) return;
+  texts.filter(Boolean).slice(0,12).forEach(function(t){ loadCloud(t, cv).catch(function(){}); });
+}
+function itemSpeakTexts(it){
+  if(!it) return [];
+  return [it.word].concat(String(it.example||'').split(/\s*\/\s*/).filter(Boolean));
+}
 async function cloudUrl(text, voiceId){
   var k = voiceId+'|'+text;
   if(ttsUrlCache[k]) return ttsUrlCache[k];
@@ -600,7 +632,14 @@ function speakCloud(text, voiceId){
   var my = ++ttsReq;
   if('speechSynthesis' in window) window.speechSynthesis.cancel();
   try{ ttsAudio.pause(); }catch(e){}
-  cloudUrl(text, voiceId).then(function(url){
+  var ready = ttsBlobUrl[voiceId+'|'+ttsNorm(text)];
+  if(ready){
+    ttsAudio.muted = false; ttsAudio.src = ready; ttsAudio.currentTime = 0;
+    var p0 = ttsAudio.play();
+    if(p0 && p0.catch) p0.catch(function(){ if(my===ttsReq) speakLocal(text); });
+    return;
+  }
+  loadCloud(text, voiceId).then(function(url){
     if(my !== ttsReq) return;
     ttsAudio.muted = false; ttsAudio.src = url;
     var p = ttsAudio.play();
@@ -629,7 +668,9 @@ function speakLocal(text, voiceOverride){
   window.speechSynthesis.speak(utter);
 }
 function bindSpeakables(root){
-  root.querySelectorAll('[data-speak]').forEach(function(el){
+  var els = root.querySelectorAll('[data-speak]');
+  prefetchTts(Array.from(els).map(function(el){ return el.dataset.speak; }));
+  els.forEach(function(el){
     el.onclick = function(e){ e.stopPropagation(); speak(el.dataset.speak||''); };
   });
 }
@@ -1357,6 +1398,7 @@ function renderSession(){
     document.getElementById('wrongBtn').onclick = function(){ flingCard(swipeEl, false); };
     document.getElementById('rightBtn').onclick = function(){ flingCard(swipeEl, true); };
     bindSpeakables(view);
+    prefetchTts(itemSpeakTexts(item).concat(itemSpeakTexts(s.queue[s.idx+1]), itemSpeakTexts(s.queue[s.idx+2])));
     enableSwipe(swipeEl, face);
   }
 }
