@@ -1388,8 +1388,7 @@ function renderSession(){
     + '<div class="swipe'+(s.entering?' enter':'')+'" id="swipeEl"><div class="flip'+(s.flipIn?' pre':'')+'" id="flipEl">'
     + (s.revealed
       ? '<div class="card" id="cardBack">'
-        + '<div class="stamp ok" id="stampOk">정답!</div><div class="stamp no" id="stampNo">땡!</div>'
-        + '<div class="a-en" data-speak="'+escapeHtml(item.word)+'">'+escapeHtml(item.word)+'</div>'
+                + '<div class="a-en" data-speak="'+escapeHtml(item.word)+'">'+escapeHtml(item.word)+'</div>'
         + '<div class="a-ko">'+escapeHtml(item.meaning)+'</div>'
         + '<div class="a-chips"><span class="pos '+posCls(item.pos)+'">'+escapeHtml(item.pos||'기타')+'</span>'+wrongTag(item.id)+'</div>'
         + '<div class="hr"></div>'
@@ -1475,17 +1474,24 @@ function flingCard(card, correct){
   if(!card || card.dataset.flinging) return;
   card.dataset.flinging = '1';
   var ghost = document.getElementById('ghostEl');
-  var stamp = document.getElementById(correct ? 'stampOk' : 'stampNo');
-  if(stamp) stamp.style.opacity = '1';
+  tintCard(document.getElementById('cardBack'), correct ? 1 : -1, true);
   card.style.transition = 'transform .72s cubic-bezier(.36,.62,.4,1), opacity .72s ease';
   card.style.transform = 'translateX('+(correct?660:-660)+'px) rotate('+(correct?16:-16)+'deg)';
   card.style.opacity = '0';
   setTimeout(function(){ gradeCard(correct); }, 330);
 }
 
+function tintCard(el, v, animate){
+  if(!el) return;
+  el.style.transition = animate ? 'border-color .2s ease, box-shadow .2s ease' : 'none';
+  if(!v){ el.style.borderColor = ''; el.style.boxShadow = ''; return; }
+  var c = v > 0 ? 'var(--mint)' : 'var(--danger)', p = Math.round(Math.abs(v)*100);
+  el.style.borderColor = 'color-mix(in srgb, '+c+' '+p+'%, var(--line-strong))';
+  el.style.boxShadow = 'inset 0 0 0 '+(Math.abs(v)*2.5).toFixed(2)+'px color-mix(in srgb, '+c+' '+p+'%, transparent), 0 0 '+Math.round(Math.abs(v)*28)+'px color-mix(in srgb, '+c+' '+Math.round(p*.35)+'%, transparent), var(--shadow-1)';
+}
 function enableSwipe(card, scrollFace){
   var x0=null, y0=null, dx=0, dy=0, dragging=false, axis=null;
-  var ok = document.getElementById('stampOk'), no = document.getElementById('stampNo');
+  var back = document.getElementById('cardBack');
   function down(e){
     if(card.dataset.flinging) return;
     if(e.target.closest('[data-speak]')) return;
@@ -1504,8 +1510,7 @@ function enableSwipe(card, scrollFace){
     if(axis !== 'x') return;
     if(e.cancelable) e.preventDefault();
     card.style.transform = 'translateX('+dx+'px) rotate('+(dx/30)+'deg)';
-    if(ok) ok.style.opacity = dx > 20 ? Math.min(1, (dx-20)/70) : 0;
-    if(no) no.style.opacity = dx < -20 ? Math.min(1, (-dx-20)/70) : 0;
+    tintCard(back, Math.abs(dx) < 8 ? 0 : Math.max(-1, Math.min(1, dx/100)), false);
   }
   function up(){
     if(!dragging) return;
@@ -1514,8 +1519,7 @@ function enableSwipe(card, scrollFace){
     if(Math.abs(dx) > 84){ flingCard(card, dx > 0); return; }
     card.style.transition = 'transform .2s ease, opacity .2s ease';
     card.style.transform = '';
-    if(ok) ok.style.opacity = 0;
-    if(no) no.style.opacity = 0;
+    tintCard(back, 0, true);
   }
   card.addEventListener('mousedown', down);
   card.addEventListener('touchstart', down, {passive:true});
