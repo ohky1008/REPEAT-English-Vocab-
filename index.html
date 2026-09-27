@@ -356,6 +356,15 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .pospick button.on.pos-adj{background:var(--pos-adj-bg);color:var(--pos-adj)}
 .pospick button.on.pos-adv{background:var(--pos-adv-bg);color:var(--pos-adv)}
 .pospick button.on.pos-etc{background:var(--pos-etc-bg);color:var(--pos-etc)}
+.word-row{display:flex;gap:8px;align-items:stretch}
+.word-row input{flex:1;min-width:0}
+.fill-btn{flex:none;display:flex;align-items:center;gap:5px;padding:0 13px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:transform .12s,opacity .2s}
+.fill-btn:active{transform:scale(.95)}
+.fill-btn[disabled]{opacity:.55}
+.fill-btn .spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);animation:fillspin .7s linear infinite}
+@keyframes fillspin{to{transform:rotate(360deg)}}
+.fill-msg{font-size:11.5px;margin-top:6px;color:var(--muted)}
+.fill-msg.err{color:var(--danger)}
 .sa-field{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 11px;margin-bottom:9px}
 .sa-field b{flex:none;width:19px;height:19px;border-radius:6px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .sa-field.syn b{background:var(--mint-soft);color:var(--mint-ink)}
@@ -1147,6 +1156,42 @@ document.addEventListener('click', function(e){
 function openSheet(kind){ state.sheet = kind; render(); }
 function closeSheet(){ state.sheet = null; render(); }
 
+var wordFillCache = {};
+async function autoFillWord(m, manual){
+  var w = (m.word||'').trim();
+  if(m.filling) return;
+  if(!w){ if(manual){ m.fillMsg = '단어를 먼저 입력해 주세요'; m.fillErr = true; render(); } return; }
+  if(!sb){ m.fillMsg = '로그인 후 사용할 수 있어요'; m.fillErr = true; render(); return; }
+  var key = w.toLowerCase();
+  if(!manual && m.lastFilled === key) return;
+  m.filling = true; m.fillMsg = ''; m.fillErr = false; render();
+  try{
+    var d = wordFillCache[key];
+    if(!d){
+      var res = await sb.functions.invoke('word-fill', { body: { word: w } });
+      if(res.error){
+        var msg = res.error.message;
+        try{ var ej = await res.error.context.json(); if(ej && ej.error) msg = ej.error; }catch(x){}
+        throw new Error(msg);
+      }
+      d = res.data; if(!d || d.error) throw new Error((d && d.error) || '자동 채우기 실패');
+      wordFillCache[key] = d;
+    }
+    if(state.modal !== m) return;
+    var put = function(f, v){ if(v && (manual ? true : !String(m[f]||'').trim())) m[f] = v; };
+    if(manual){ ['meaning','example','syn','ant'].forEach(function(f){ if(!String(m[f]||'').trim()) m[f] = d[f] || ''; }); }
+    else { put('meaning', d.meaning); put('example', d.example); put('syn', d.syn); put('ant', d.ant); }
+    if(d.pos && !m.posTouched) m.pos = d.pos;
+    if(d.word && d.word.toLowerCase() !== key){ m.word = d.word; m.fillMsg = '철자를 "'+d.word+'"(으)로 고쳤어요'; }
+    else m.fillMsg = '빈 칸을 채웠어요. 필요하면 수정하세요';
+    m.lastFilled = (m.word||'').toLowerCase();
+  }catch(err){
+    m.fillMsg = err && err.message || '자동 채우기 실패'; m.fillErr = true;
+  }finally{
+    m.filling = false; if(state.modal === m) render();
+  }
+}
+
 function renderSheet(){
   var root = document.getElementById('sheetRoot');
   if(!state.sheet){ root.innerHTML=''; return; }
@@ -1731,7 +1776,10 @@ function renderModal(){
       + '<button class="linkbtn" id="resetStatBtn">기록 초기화</button></div>';
   }
 
-  html += '<div class="field"><label>단어 *</label><input type="text" class="en" id="fWord" value="'+escapeHtml(m.word)+'" placeholder="예: subterfuge"></div>'
+  html += '<div class="field"><label>단어 *</label><div class="word-row"><input type="text" class="en" id="fWord" value="'+escapeHtml(m.word)+'" placeholder="예: subterfuge" autocapitalize="off" autocorrect="off" spellcheck="false">'
+      + '<button class="fill-btn" id="fillBtn"'+(m.filling?' disabled':'')+'>'+(m.filling?'<i class="spin"></i>채우는 중':'✨ 자동 채우기')+'</button></div>'
+      + (m.fillMsg ? '<div class="fill-msg'+(m.fillErr?' err':'')+'">'+escapeHtml(m.fillMsg)+'</div>' : '')
+      + '</div>'
     + '<div class="field"><label>한글 뜻 *</label><input type="text" id="fMeaning" value="'+escapeHtml(m.meaning)+'" placeholder="예: 속임수"></div>'
     + '<div class="field"><label>품사</label><div class="pospick" id="posPick">'
       + POS.map(function(p){ return '<button data-v="'+p.v+'" class="'+(m.pos===p.v?'on '+p.cls:'')+'">'+p.v+'</button>'; }).join('')
@@ -1760,6 +1808,9 @@ function renderModal(){
   document.getElementById('modalBack').onclick = function(e){ if(e.target.id==='modalBack') closeModal(); };
   document.getElementById('cancelBtn').onclick = function(){ if(m.fromView){ state.modal={mode:'view',id:m.id,shown:true}; state.deleteArmed=null; render(); } else closeModal(); };
   document.getElementById('fWord').oninput = function(e){ m.word = e.target.value; };
+  document.getElementById('fillBtn').onclick = function(){ autoFillWord(m, true); };
+  document.getElementById('fWord').onkeydown = function(e){ if(e.key==='Enter'){ e.preventDefault(); autoFillWord(m, true); } };
+  document.getElementById('fWord').onblur = function(){ if(!isEdit && !m.meaning.trim()) autoFillWord(m, false); };
   document.getElementById('fMeaning').oninput = function(e){ m.meaning = e.target.value; };
   document.getElementById('fExample').oninput = function(e){ m.example = e.target.value; };
   document.getElementById('fSyn').oninput = function(e){ m.syn = e.target.value; };
@@ -1767,7 +1818,7 @@ function renderModal(){
   document.getElementById('fList').onchange = function(e){ m.listId = e.target.value; };
   document.getElementById('posPick').onclick = function(e){
     var b = e.target.closest('button[data-v]'); if(!b) return;
-    m.pos = b.dataset.v; render();
+    m.pos = b.dataset.v; m.posTouched = true; render();
   };
   document.getElementById('saveBtn').onclick = function(){
     var word = document.getElementById('fWord').value.trim();
