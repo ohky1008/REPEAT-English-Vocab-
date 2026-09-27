@@ -683,7 +683,9 @@ var CSV_HEADER_MAP = {
   meaning: ['한글뜻','한글 뜻','뜻','meaning','의미'],
   example: ['예문','example','예시'],
   synAnt: ['동의어','동의어반의어','동의어·반의어','동의어/반의어','동반','동/반','synonym','synant','synonyms'],
-  list: ['단어장','목록','list']
+  list: ['단어장','목록','list'],
+  wrong: ['틀린횟수','틀린 횟수','틀림','wrong','wrongcount'],
+  correct: ['맞힌횟수','맞힌 횟수','정답','correct','correctcount']
 };
 var POS_ALIASES = { noun:'명사', verb:'동사', adjective:'형용사', adverb:'부사', etc:'기타', other:'기타' };
 function normalizePos(v){
@@ -697,7 +699,7 @@ function normalizePos(v){
 function csvRowsToWords(rows){
   if(!rows.length) return { items: [], skipped: 0, hasListCol: false };
   var header = rows[0].map(function(c){ return String(c).trim().toLowerCase(); });
-  var colIdx = { word:-1, pos:-1, meaning:-1, example:-1, synAnt:-1, list:-1 };
+  var colIdx = { word:-1, pos:-1, meaning:-1, example:-1, synAnt:-1, list:-1, wrong:-1, correct:-1 };
   Object.keys(CSV_HEADER_MAP).forEach(function(key){
     var aliases = CSV_HEADER_MAP[key];
     for(var i=0;i<header.length;i++){
@@ -706,7 +708,8 @@ function csvRowsToWords(rows){
   });
   var hasHeader = colIdx.word > -1 || colIdx.meaning > -1;
   var dataRows = hasHeader ? rows.slice(1) : rows;
-  if(!hasHeader){ colIdx = { word:0, pos:1, meaning:2, example:3, synAnt:4, list:-1 }; }
+  if(!hasHeader){ colIdx = { word:0, pos:1, meaning:2, example:3, synAnt:4, list:-1, wrong:-1, correct:-1 }; }
+  function num(r, k){ if(colIdx[k]<0) return 0; var n = parseInt(String(r[colIdx[k]]||'').trim(),10); return isNaN(n)||n<0 ? 0 : n; }
   var items = [], skipped = 0;
   dataRows.forEach(function(r){
     var word = colIdx.word>-1 ? (r[colIdx.word]||'').trim() : '';
@@ -718,10 +721,12 @@ function csvRowsToWords(rows){
       meaning: meaning,
       example: colIdx.example>-1 ? (r[colIdx.example]||'').trim() : '',
       synAnt: colIdx.synAnt>-1 ? (r[colIdx.synAnt]||'').trim() : '',
-      listName: colIdx.list>-1 ? (r[colIdx.list]||'').trim() : ''
+      listName: colIdx.list>-1 ? (r[colIdx.list]||'').trim() : '',
+      wrongCount: num(r,'wrong'),
+      correctCount: num(r,'correct')
     });
   });
-  return { items: items, skipped: skipped, hasListCol: colIdx.list>-1 };
+  return { items: items, skipped: skipped, hasListCol: colIdx.list>-1, hasWrongCol: colIdx.wrong>-1 };
 }
 function csvEscape(v){
   v = String(v==null ? '' : v);
@@ -729,11 +734,11 @@ function csvEscape(v){
   return v;
 }
 function buildCsvText(words, includeListCol){
-  var header = ['단어','품사','한글뜻','예문','동의어반의어'];
+  var header = ['단어','품사','한글뜻','예문','동의어반의어','틀린횟수','맞힌횟수'];
   if(includeListCol) header.push('단어장');
   var lines = [header.join(',')];
   words.forEach(function(w){
-    var row = [w.word, w.pos||'', w.meaning, w.example||'', w.synAnt||''];
+    var row = [w.word, w.pos||'', w.meaning, w.example||'', w.synAnt||'', w.wrongCount||0, w.correctCount||0];
     if(includeListCol) row.push(listName(w.listId));
     lines.push(row.map(csvEscape).join(','));
   });
@@ -869,6 +874,7 @@ var DIRS = [
 ];
 var SCOPES = [
   {v:'wrong', label:'틀린횟수 높은순', sub:'약점부터 효율적으로'},
+  {v:'wrongLow', label:'틀린횟수 낮은순', sub:'덜 틀린 단어부터'},
   {v:'new', label:'한번도 공부 안한 단어', sub:'틀림·정답 기록이 없는 단어만'},
   {v:'wrongN', label:'틀린 횟수 골라서', sub:'2번 틀린 것만 등'},
   {v:'random', label:'랜덤', sub:'전체에서 무작위로'}
@@ -1109,6 +1115,8 @@ function startSession(){
   pool = pool.map(function(w){ return [Math.random(), w]; }).sort(function(a,b){ return a[0]-b[0]; }).map(function(p){ return p[1]; });
   if(state.setup.scope==='wrong'){
     pool.sort(function(a,b){ return (b.wrongCount||0) - (a.wrongCount||0); });
+  } else if(state.setup.scope==='wrongLow'){
+    pool.sort(function(a,b){ return (a.wrongCount||0) - (b.wrongCount||0); });
   }
   pool = pool.slice(0, state.setup.count);
   var queue = pool.map(function(w){
@@ -1833,10 +1841,12 @@ function refreshCsvPreview(){
   var html = '';
   if(res.items.length){
     html += '<div class="csvprev"><table><thead><tr><th>단어</th><th>품사</th><th>한글뜻</th><th>예문</th><th>동·반</th>'
+      + (res.hasWrongCol ? '<th>틀림</th>' : '')
       + (res.hasListCol ? '<th>단어장</th>' : '') + '</tr></thead><tbody>'
       + res.items.slice(0,5).map(function(it){
           return '<tr><td>'+escapeHtml(it.word)+'</td><td>'+escapeHtml(it.pos)+'</td><td>'+escapeHtml(it.meaning)+'</td>'
             + '<td>'+escapeHtml(it.example)+'</td><td>'+escapeHtml(it.synAnt)+'</td>'
+            + (res.hasWrongCol ? '<td>'+it.wrongCount+'</td>' : '')
             + (res.hasListCol ? '<td>'+escapeHtml(it.listName||'—')+'</td>' : '') + '</tr>';
         }).join('') + '</tbody></table></div>';
     html += '<div class="csvsum">가져올 단어 <b>'+res.items.length+'</b>개'
@@ -1879,7 +1889,7 @@ async function runCsvImport(){
     var it = res.items[i];
     var targetId = it.listName ? await resolveListByName(listCache, it.listName) : await getFallbackListId();
     lastListId = targetId;
-    await Store.addAsync({word:it.word, pos:it.pos, meaning:it.meaning, example:it.example, synAnt:it.synAnt, listId:targetId});
+    await Store.addAsync({word:it.word, pos:it.pos, meaning:it.meaning, example:it.example, synAnt:it.synAnt, wrongCount:it.wrongCount, correctCount:it.correctCount, listId:targetId});
     m.progress = i+1; render();
   }
   state.bank.listId = res.hasListCol ? null : lastListId;
