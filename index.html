@@ -358,10 +358,10 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .pospick button.on.pos-etc{background:var(--pos-etc-bg);color:var(--pos-etc)}
 .word-row{display:flex;gap:8px;align-items:stretch}
 .word-row input{flex:1;min-width:0}
-.fill-btn{flex:none;display:flex;align-items:center;gap:5px;padding:0 13px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:transform .12s,opacity .2s}
+.fill-btn{flex:none;width:46px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:12px;border:1px solid var(--line);background:var(--ink);color:var(--surface);cursor:pointer;transition:transform .12s,opacity .2s}
 .fill-btn:active{transform:scale(.95)}
 .fill-btn[disabled]{opacity:.55}
-.fill-btn .spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);animation:fillspin .7s linear infinite}
+.fill-btn .spin{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:currentColor;animation:fillspin .7s linear infinite}
 @keyframes fillspin{to{transform:rotate(360deg)}}
 .fill-msg{font-size:11.5px;margin-top:6px;color:var(--muted)}
 .fill-msg.err{color:var(--danger)}
@@ -1777,7 +1777,7 @@ function renderModal(){
   }
 
   html += '<div class="field"><label>단어 *</label><div class="word-row"><input type="text" class="en" id="fWord" value="'+escapeHtml(m.word)+'" placeholder="예: subterfuge" autocapitalize="off" autocorrect="off" spellcheck="false">'
-      + '<button class="fill-btn" id="fillBtn"'+(m.filling?' disabled':'')+'>'+(m.filling?'<i class="spin"></i>채우는 중':'✨ 자동 채우기')+'</button></div>'
+      + '<button class="fill-btn" id="fillBtn" aria-label="자동 채우기" title="자동 채우기"'+(m.filling?' disabled':'')+'>'+(m.filling?'<i class="spin"></i>':'<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M10 3.5c.3 0 .5.2.6.5l1 3.4a4 4 0 0 0 2.9 2.9l3.4 1c.3.1.5.3.5.6s-.2.5-.5.6l-3.4 1a4 4 0 0 0-2.9 2.9l-1 3.4c-.1.3-.3.5-.6.5s-.5-.2-.6-.5l-1-3.4a4 4 0 0 0-2.9-2.9l-3.4-1c-.3-.1-.5-.3-.5-.6s.2-.5.5-.6l3.4-1a4 4 0 0 0 2.9-2.9l1-3.4c.1-.3.3-.5.6-.5Z"/><path d="M18.5 2c.2 0 .3.1.4.3l.4 1.3c.1.5.5.9 1 1l1.3.4c.2.1.3.2.3.4s-.1.3-.3.4l-1.3.4c-.5.1-.9.5-1 1l-.4 1.3c-.1.2-.2.3-.4.3s-.3-.1-.4-.3l-.4-1.3c-.1-.5-.5-.9-1-1L15.4 6c-.2-.1-.3-.2-.3-.4s.1-.3.3-.4l1.3-.4c.5-.1.9-.5 1-1l.4-1.3c.1-.2.2-.3.4-.3Z" opacity=".55"/></svg>')+'</button></div>'
       + (m.fillMsg ? '<div class="fill-msg'+(m.fillErr?' err':'')+'">'+escapeHtml(m.fillMsg)+'</div>' : '')
       + '</div>'
     + '<div class="field"><label>한글 뜻 *</label><input type="text" id="fMeaning" value="'+escapeHtml(m.meaning)+'" placeholder="예: 속임수"></div>'
