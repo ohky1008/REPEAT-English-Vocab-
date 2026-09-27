@@ -92,6 +92,24 @@ input,select,textarea{font-size:16px !important}
 @keyframes vwUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes vwFade{from{background-color:transparent}}
 @media (min-width:640px){.sheet.vw-sheet{height:auto;max-height:86vh}}
+/* motion: press + screen transitions */
+button,.row,.wrow,.opt,[data-tap]{transition:scale .24s cubic-bezier(.3,.7,.35,1),filter .2s ease,background-color .2s ease}
+.tap{scale:.955;filter:brightness(.93)}
+.tabbar button .ic{border-radius:11px;transition:background-color .18s ease,scale .24s cubic-bezier(.3,.7,.35,1)}
+.tabbar button.tap{scale:1;filter:none}
+.tabbar button.tap .ic{background:rgba(0,0,0,.08);scale:.88}
+.scr-in{animation:scrIn .34s cubic-bezier(.2,.8,.25,1) both}
+@keyframes scrIn{from{opacity:0;filter:brightness(.8);transform:translateY(10px)}to{opacity:1;filter:none;transform:none}}
+.back.pop-in{animation:vwFade .26s ease both}
+.back.pop-in>.sheet{animation:vwUp .34s cubic-bezier(.22,.9,.3,1) both}
+.back.pop-out{animation:backOut .24s ease forwards;pointer-events:none}
+.back.pop-out>.sheet{animation:sheetOut .24s cubic-bezier(.5,0,.9,.5) forwards}
+@keyframes backOut{to{background-color:transparent}}
+@keyframes sheetOut{to{transform:translateY(100%)}}
+.menu.pop-in{transform-origin:top right;animation:menuIn .2s cubic-bezier(.2,.8,.25,1) both}
+.menu.pop-out{transform-origin:top right;animation:menuIn .16s ease reverse forwards;pointer-events:none}
+@keyframes menuIn{from{opacity:0;transform:scale(.92) translateY(-6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.scr-in,.pop-in,.pop-in>.sheet{animation:none !important}}
 .vw-spk{flex:none;width:38px;height:38px;border-radius:50%;border:none;background:var(--mint-soft);color:var(--mint);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .vw-meta{font-size:12px;color:var(--muted);margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
 .vw-meta b{color:var(--ink);font-family:var(--f-mono);font-weight:600}
@@ -904,6 +922,68 @@ function switchTab(t){
   render();
   requestAnimationFrame(function(){ if(v){ v.scrollTop = 0; v.style.overflowY=''; } });
 }
+/* ---------------- motion ---------------- */
+function playScreenIn(el){
+  if(!el) return;
+  el.classList.remove('scr-in'); void el.offsetWidth; el.classList.add('scr-in');
+  el.addEventListener('animationend', function h(e){ if(e.target===el){ el.classList.remove('scr-in'); el.removeEventListener('animationend', h); } });
+}
+(function(){
+  var SEL = 'button,.row,.wrow,.opt,[data-tap]';
+  var cur = null, sx = 0, sy = 0;
+  function release(){ if(cur){ cur.classList.remove('tap'); cur = null; } }
+  document.addEventListener('pointerdown', function(e){
+    var t = e.target.closest && e.target.closest(SEL);
+    if(!t || t.disabled) return;
+    release(); cur = t; sx = e.clientX; sy = e.clientY; t.classList.add('tap');
+  }, true);
+  document.addEventListener('pointermove', function(e){ if(cur && (Math.abs(e.clientX-sx)>10 || Math.abs(e.clientY-sy)>10)) release(); }, true);
+  ['pointerup','pointercancel','dragstart'].forEach(function(ev){ document.addEventListener(ev, function(){ setTimeout(release, 60); }, true); });
+
+  function realKids(root){ return Array.prototype.filter.call(root.children, function(c){ return !c.classList.contains('fx-ghost'); }); }
+  function keyOf(el){ if(!el) return ''; var s = el.firstElementChild || el; var clean = function(c){ return String(c||'').replace(/\b(enter|pop-in|pop-out|scr-in|tap)\b/g,'').replace(/\s+/g,' ').trim(); }; return clean(el.className)+'|'+(s.id||clean(s.className)); }
+  function watch(id){
+    var root = document.getElementById(id); if(!root) return;
+    var prevKey = '';
+    new MutationObserver(function(recs){
+      var kids = realKids(root);
+      var nowKey = kids.length ? keyOf(kids[0]) : '';
+      if(!kids.length && prevKey){
+        var gone = null;
+        recs.forEach(function(r){ Array.prototype.forEach.call(r.removedNodes, function(n){ if(n.nodeType===1 && !n.classList.contains('fx-ghost')) gone = n; }); });
+        var sh = gone && gone.querySelector && gone.querySelector('.sheet');
+        var dragged = sh && sh.style.transform && !/translateY\(0/.test(sh.style.transform);
+        if(gone && !dragged && (gone.classList.contains('back') || gone.classList.contains('menu'))){
+          gone.classList.remove('pop-in','enter'); if(sh) sh.classList.remove('enter');
+          gone.classList.add('fx-ghost','pop-out');
+          gone.querySelectorAll('[id]').forEach(function(n){ n.removeAttribute('id'); }); gone.removeAttribute('id');
+          root.appendChild(gone);
+          setTimeout(function(){ if(gone.parentNode) gone.parentNode.removeChild(gone); }, 260);
+        }
+      } else if(kids.length && nowKey !== prevKey){
+        var el = kids[0];
+        if(el.classList.contains('back') && !el.classList.contains('enter') && !el.classList.contains('vw')) el.classList.add('pop-in');
+        else if(el.classList.contains('menu')) el.classList.add('pop-in');
+        else if(prevKey && el.classList.contains('back')){ var s2 = el.querySelector('.sheet'); if(s2 && !el.classList.contains('enter')) playScreenIn(s2); }
+      }
+      prevKey = nowKey;
+    }).observe(root, {childList:true});
+  }
+  ['menuRoot','sheetRoot','modalRoot','listModalRoot','csvModalRoot','voiceModalRoot','exportModalRoot'].forEach(watch);
+
+  var auth = document.getElementById('authScreen'), authKey = '';
+  new MutationObserver(function(){
+    var k = auth.firstElementChild ? (authState.stage+'|'+authState.mode) : '';
+    if(k && k !== authKey) playScreenIn(auth.firstElementChild);
+    authKey = k;
+  }).observe(auth, {childList:true});
+})();
+var lastScreenKey = null;
+function screenKey(){
+  var s = state.session;
+  return state.tab + ':' + (state.tab==='study' ? (s ? (s.idx < s.queue.length ? 'run' : 'done') : 'setup') : (Store.lists.length ? 'list' : 'empty'));
+}
+
 function render(){
   renderSyncPill();
   document.getElementById('tabStudy').classList.toggle('on', state.tab==='study');
@@ -912,6 +992,9 @@ function render(){
   var inCard = state.tab==='study' && !!(state.session && state.session.idx < state.session.queue.length);
   view.classList.toggle('scrolly', !inCard);
   if(lastRenderedTab !== state.tab){ view.scrollTop = 0; lastRenderedTab = state.tab; }
+  var sk = screenKey();
+  if(lastScreenKey !== null && sk !== lastScreenKey) playScreenIn(view);
+  lastScreenKey = sk;
   renderMenu();
   renderSheet();
   renderModal();
@@ -1989,7 +2072,9 @@ var authState = { session:null, mode:'signin', email:'', pw:'', pw2:'', showPw:f
 function renderApp(){
   var appWrap = document.getElementById('appWrap');
   if(authState.session){
+    var wasHidden = appWrap.hidden;
     appWrap.hidden = false;
+    if(wasHidden) playScreenIn(appWrap);
     document.getElementById('authScreen').innerHTML = '';
     render();
   } else {
