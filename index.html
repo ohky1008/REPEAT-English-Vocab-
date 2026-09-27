@@ -589,6 +589,9 @@ async function cloudUrl(text, voiceId){
   var k = voiceId+'|'+text;
   if(ttsUrlCache[k]) return ttsUrlCache[k];
   var res = await sb.functions.invoke('smart-processor', { body: { text: text, voice: voiceId } });
+  if(res.error && res.error.context && res.error.context.json){
+    try{ var ej = await res.error.context.json(); throw new Error((ej && ej.error) || res.error.message); }catch(x){ throw x; }
+  }
   if(res.error || !res.data || !res.data.url) throw new Error((res.data && res.data.error) || (res.error && res.error.message) || 'tts failed');
   ttsUrlCache[k] = res.data.url;
   return res.data.url;
@@ -601,9 +604,10 @@ function speakCloud(text, voiceId){
     if(my !== ttsReq) return;
     ttsAudio.muted = false; ttsAudio.src = url;
     var p = ttsAudio.play();
-    if(p && p.catch) p.catch(function(){ if(my===ttsReq) speakLocal(text); });
+    if(p && p.catch) p.catch(function(e){ showError('온라인 음성 재생 차단: '+(e && e.name || e)); if(my===ttsReq) speakLocal(text); });
   }).catch(function(err){
     console.warn('cloud tts', err);
+    showError('온라인 음성 오류: '+(err && err.message || err));
     if(my === ttsReq) speakLocal(text);
   });
 }
