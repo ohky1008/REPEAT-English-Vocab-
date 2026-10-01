@@ -158,6 +158,20 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .setup{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px}
 .setup-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
 .setup-title{font-family:var(--f-kr);font-size:19px;letter-spacing:.01em}
+.dist{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:12px}
+.dist .setup-title{font-size:16px}
+.dist-sub{font-size:12px;color:var(--muted);font-family:var(--f-mono)}
+.dist-cols{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding:6px 16px 14px;align-items:end}
+.dist-col{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.dist-track{width:100%;max-width:44px;height:120px;display:flex;align-items:flex-end;border-radius:8px;background:var(--line-soft);overflow:hidden}
+.dist-bar{display:block;width:100%;border-radius:8px 8px 0 0;transition:height .35s}
+.dist-v{font-family:var(--f-mono);font-size:15px;font-weight:700;color:var(--ink)}
+.dist-k{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.dist-col.zero .dist-v{color:var(--faint)}
+.dist-col.fresh .dist-bar{background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 8px);border:1px solid var(--line);border-bottom:none;box-sizing:border-box}
+.dist-col.fresh .dist-k{font-family:var(--f-kr);font-size:11px;white-space:nowrap}
+.dist-bar.heat-0{background:var(--line)}
+.dist-bar.heat-1{background:var(--heat-1)}.dist-bar.heat-2{background:var(--heat-2)}.dist-bar.heat-3{background:var(--heat-3)}.dist-bar.heat-4{background:var(--heat-4)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:none;border-top:1px solid var(--line-soft);padding:12px 16px;color:var(--ink);cursor:pointer;text-align:left}
 .row:hover{background:var(--hover)}
 .row-k{font-size:12.5px;color:var(--muted)}
@@ -374,6 +388,10 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .stat-row{display:flex;gap:16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:12px;font-size:13px;color:var(--muted)}
 .stat-row b{color:var(--ink);font-family:var(--f-mono)}
 .stat-row .linkbtn{margin-left:auto;color:var(--danger)}
+.wstep{display:flex;align-items:center;gap:8px}
+.wstep b{min-width:12px;text-align:center}
+.stepbtn{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.stepbtn:disabled{opacity:.35;cursor:default}
 .danger{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px}
 .delbtn{background:none;border:1px solid var(--danger);color:var(--danger);border-radius:11px;padding:10px 14px;font-size:13.5px;font-weight:600;cursor:pointer}
 .confirm{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--danger)}
@@ -684,12 +702,14 @@ function bindSpeakables(root){
   });
 }
 
+var MAX_WRONG = 5;
+function clampWrong(n){ n = parseInt(n,10)||0; return n<0 ? 0 : (n>MAX_WRONG ? MAX_WRONG : n); }
 function heatLevel(n){
   n = n||0;
   if(n<=0) return 0;
-  if(n<=2) return 1;
-  if(n<=4) return 2;
-  if(n<=7) return 3;
+  if(n<=1) return 1;
+  if(n<=3) return 2;
+  if(n<=4) return 3;
   return 4;
 }
 
@@ -849,7 +869,7 @@ function csvRowsToWords(rows){
       example: colIdx.example>-1 ? (r[colIdx.example]||'').trim() : '',
       synAnt: colIdx.synAnt>-1 ? (r[colIdx.synAnt]||'').trim() : '',
       listName: colIdx.list>-1 ? (r[colIdx.list]||'').trim() : '',
-      wrongCount: num(r,'wrong'),
+      wrongCount: clampWrong(num(r,'wrong')),
       correctCount: num(r,'correct')
     });
   });
@@ -877,7 +897,7 @@ function rowToWord(r){
   return {
     id: r.id, listId: r.list_id, word: r.word, pos: r.pos, meaning: r.meaning,
     example: r.example || '', synAnt: r.syn_ant || '',
-    wrongCount: r.wrong_count||0, correctCount: r.correct_count||0,
+    wrongCount: clampWrong(r.wrong_count), correctCount: r.correct_count||0,
     createdAt: r.created_at ? new Date(r.created_at).getTime() : 0
   };
 }
@@ -889,7 +909,7 @@ function wordToRow(data, userId){
   if(data.example!==undefined) row.example = data.example;
   if(data.synAnt!==undefined) row.syn_ant = data.synAnt;
   if(data.listId!==undefined) row.list_id = data.listId;
-  if(data.wrongCount!==undefined) row.wrong_count = data.wrongCount;
+  if(data.wrongCount!==undefined) row.wrong_count = clampWrong(data.wrongCount);
   if(data.correctCount!==undefined) row.correct_count = data.correctCount;
   if(userId) row.user_id = userId;
   return row;
@@ -1321,6 +1341,24 @@ function renderStudyTab(){
       + '<div class="n">'+(pool.length ? state.setup.count+'문제' : '학습할 단어 없음')+'</div>'
       + '<div class="t">학습 시작</div></button></div>'
     + '</div>'
+    + (function(){
+        var dist = [0,0,0,0,0,0], fresh = 0;
+        scoped.forEach(function(w){
+          if(!(w.wrongCount>0) && !(w.correctCount>0)) fresh++;
+          else dist[clampWrong(w.wrongCount)]++;
+        });
+        var max = Math.max.apply(null, dist.concat([fresh])) || 1;
+        var freshCol = fresh ? '<div class="dist-col fresh"><span class="dist-v">'+fresh+'</span>'
+          + '<span class="dist-track"><span class="dist-bar" style="height:'+Math.max(4, Math.round(fresh/max*100))+'%"></span></span>'
+          + '<span class="dist-k">미학습</span></div>' : '';
+        return '<div class="dist"><div class="setup-h"><div class="setup-title">틀린 횟수 분포</div><span class="dist-sub">'+escapeHtml(state.setup.listId ? listName(state.setup.listId) : '전체')+' · '+scoped.length+'개</span></div>'
+          + '<div class="dist-cols" style="grid-template-columns:repeat('+(fresh?7:6)+',minmax(0,1fr))">' + freshCol + dist.map(function(c,n){
+              return '<div class="dist-col'+(c?'':' zero')+'">'
+                + '<span class="dist-v">'+c+'</span>'
+                + '<span class="dist-track"><span class="dist-bar heat-'+heatLevel(n)+'" style="height:'+(c ? Math.max(4, Math.round(c/max*100)) : 0)+'%"></span></span>'
+                + '<span class="dist-k">'+n+'번</span></div>';
+            }).join('') + '</div></div>';
+      })()
     + (pool.length===0 ? '<p class="note">'+(state.setup.scope==='new' ? '이미 전부 한 번 이상 학습했어요. 범위를 바꿔보세요.' : '이 조건에 맞는 단어가 없어요.')+'</p>' : '')
     + '</div>';
 
@@ -1548,7 +1586,7 @@ function gradeCard(correct){
   if(!s || s.idx >= s.queue.length) return;
   var item = s.queue[s.idx];
   var live = currentWordLive(item.id);
-  Store.update(item.id, correct ? { correctCount: (live.correctCount||0) + 1 } : { wrongCount: (live.wrongCount||0) + 1 });
+  if(!s.noCount) Store.update(item.id, correct ? { correctCount: (live.correctCount||0) + 1 } : { wrongCount: clampWrong((live.wrongCount||0) + 1) });
   s.results.push({ id:item.id, word:item.word, meaning:item.meaning, correct: correct });
   s.idx += 1;
   s.revealed = false;
@@ -1565,7 +1603,7 @@ function renderSummary(){
   var html = '<div class="sum">'
     + '<div class="sum-big"><div class="n">'+right+'</div><div class="d">/ '+total+'</div></div>'
     + '<div class="sum-t">'+(right===total ? '전부 맞혔어요!' : '좋아요, '+right+'개 맞혔어요')+'</div>'
-    + '<div class="sum-s">'+(missed.length ? '틀린 '+missed.length+'개는 다음 복습에서 먼저 나와요' : '이 세션에서 틀린 단어가 없어요')+'</div>';
+    + '<div class="sum-s">'+(s.noCount ? '복습 모드 · 틀린 횟수에 반영되지 않아요' : missed.length ? '틀린 '+missed.length+'개는 다음 복습에서 먼저 나와요' : '이 세션에서 틀린 단어가 없어요')+'</div>';
 
   if(missed.length){
     html += '<div class="miss"><div class="hl">틀린 단어</div>'
@@ -1585,7 +1623,7 @@ function renderSummary(){
         var dir = state.setup.dir==='mixed' ? (Math.random()<0.5?'en2ko':'ko2en') : state.setup.dir;
         return { id:w.id, word:w.word, pos:w.pos, example:w.example, synAnt:w.synAnt, meaning:w.meaning, dir:dir, hintEx:false, hintSyn:false };
       });
-      state.session = { queue: queue, idx:0, revealed:false, results:[], flip:false };
+      state.session = { queue: queue, idx:0, revealed:false, results:[], flip:false, noCount:true };
       render();
     };
   }
@@ -1776,7 +1814,11 @@ function renderModal(){
     + '<button class="save" id="saveBtn">저장</button></div>';
 
   if(isEdit){
-    html += '<div class="stat-row">틀림 <b>'+m.wrongCount+'</b> · 정답 <b>'+m.correctCount+'</b>'
+    html += '<div class="stat-row"><span class="wstep">틀림'
+      + '<button class="stepbtn" id="wrongDec" aria-label="틀린 횟수 줄이기"'+(m.wrongCount<=0?' disabled':'')+'>−</button>'
+      + '<b>'+m.wrongCount+'</b>'
+      + '<button class="stepbtn" id="wrongInc" aria-label="틀린 횟수 늘리기"'+(m.wrongCount>=MAX_WRONG?' disabled':'')+'>+</button></span>'
+      + '<span>정답 <b>'+m.correctCount+'</b></span>'
       + '<button class="linkbtn" id="resetStatBtn">기록 초기화</button></div>';
   }
 
@@ -1841,6 +1883,13 @@ function renderModal(){
     if(isEdit){ Store.update(m.id, data); state.modal={mode:'view',id:m.id,shown:true}; state.deleteArmed=null; render(); } else { Store.add(data); closeModal(); }
   };
   if(isEdit){
+    var stepWrong = function(d){
+      var n = clampWrong((m.wrongCount||0) + d);
+      if(n===m.wrongCount) return;
+      m.wrongCount = n; Store.update(m.id, {wrongCount:n}); render();
+    };
+    document.getElementById('wrongDec').onclick = function(){ stepWrong(-1); };
+    document.getElementById('wrongInc').onclick = function(){ stepWrong(1); };
     document.getElementById('resetStatBtn').onclick = function(){
       Store.update(m.id, {wrongCount:0, correctCount:0});
       m.wrongCount = 0; m.correctCount = 0; render();
