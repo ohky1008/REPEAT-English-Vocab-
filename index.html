@@ -1469,9 +1469,11 @@ function renderSession(){
     face.onclick = function(){
       if(flipEl.dataset.busy) return;
       flipEl.dataset.busy = '1';
+      speak(item.word);
       flipEl.classList.add('half');
       setTimeout(function(){ s.revealed = true; s.flipIn = true; render(); }, 170);
     };
+    prefetchTts([item.word]);
     var hx = document.getElementById('hintExBtn');
     if(hx) hx.onclick = function(e){ e.stopPropagation(); item.hintEx = true; render(); };
     var hs = document.getElementById('hintSynBtn');
@@ -1573,7 +1575,7 @@ document.addEventListener('keydown', function(e){
   if(!s || state.sheet || state.modal || state.listModal || state.csvModal || state.voiceModal || state.exportModal) return;
   if(s.idx >= s.queue.length) return;
   if(!s.revealed){
-    if(e.key===' ' || e.key==='Enter'){ e.preventDefault(); s.revealed = true; s.flip = true; render(); }
+    if(e.key===' ' || e.key==='Enter'){ e.preventDefault(); speak(s.queue[s.idx].word); s.revealed = true; s.flip = true; render(); }
     return;
   }
   var cardEl = document.getElementById('swipeEl');
