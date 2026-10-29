@@ -453,31 +453,76 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .pw-wrap{position:relative}
 .pw-wrap button{position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer}
 
-/* 3방향 채점 (← 올림 · ↓ 내림 · → 유지) */
-.grade3{display:flex;align-items:flex-start;justify-content:space-between;padding:0 24px 4px}
-.g3{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;padding:0;cursor:pointer;color:var(--muted);font-family:inherit}
-.g3 .gbtn{width:50px;height:50px;font-size:16px}
-.g3l{font-size:11.5px;font-weight:600}
-.g3.up .g3l{color:var(--danger)}
-.g3.down .g3l{color:var(--mint)}
-.gbtn.hold{background:var(--chip-bg);color:var(--ink-2)}
-.grade3+.ghint{padding:2px 0 14px}
-/* 분포 막대 = 버튼, 위젯 안 단어장 선택 */
+/* 채점 버튼: 카드 좌우 끝선(32px)에 맞춘 3등분 · ← 올림 · ↓ 내림 · → 유지 */
+.gradeA{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 32px 16px;transition:opacity .2s ease}
+.gradeA.off{visibility:hidden;opacity:0}
+.ga{height:56px;border:none;border-radius:14px;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;transition:scale .16s cubic-bezier(.3,.7,.35,1),filter .16s ease,box-shadow .2s ease}
+.ga b{font-size:15px;font-weight:700;line-height:1.2}
+.ga span{font-size:11px;font-weight:600}
+.ga.up{background:var(--danger-soft);color:var(--danger)}
+.ga.down{background:var(--chip-bg);color:var(--muted)}
+.ga.down b{font-size:13px}
+.ga.hold{background:var(--mint-soft);color:var(--mint-ink)}
+.ga.hit{scale:.94;filter:brightness(1.2);box-shadow:inset 0 0 0 2px currentColor}
+@media (min-width:900px){.gradeA{max-width:560px;margin:0 auto}}
+/* 분포 막대 = 버튼 */
 .dist{margin-top:14px}
-.dist-col{background:none;border:none;padding:6px 0 4px;border-radius:10px;cursor:pointer;color:inherit;font-family:inherit}
+.dist.ov{overflow:visible;position:relative;z-index:3}
+.dist-col{background:none;border:none;padding:6px 0 4px;border-radius:10px;cursor:pointer;color:inherit;font-family:inherit;transition:background-color .2s ease,box-shadow .2s ease}
 .dist-col:hover{background:var(--hover)}
 .dist-col:disabled{cursor:default;background:none}
-.dist-lists{display:flex;gap:6px;padding:0 14px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x}
-.dist-lists .lchip{background:var(--chip-bg)}
-.dist-lists .lchip.on{background:var(--mint-soft);color:var(--ink);font-weight:700;box-shadow:inset 0 0 0 1px var(--mint)}
-/* 막대를 눌렀을 때 뜨는 학습 시트 */
-.tier-sum{font-size:14px;color:var(--ink-2);margin-bottom:6px}
-.tier-sum b{font-family:var(--f-mono);font-size:26px;color:var(--ink);margin-right:2px}
-.tier-sum span{color:var(--muted);font-size:12.5px;margin-left:6px}
-.tier-sub{font-size:12.5px;color:var(--muted);margin-top:4px}
-.tier-k{font-size:11.5px;color:var(--muted);margin:16px 0 7px}
+.dist-col.on{background:var(--mint-soft);box-shadow:inset 0 0 0 1.5px var(--mint)}
+.dist-col.on .dist-k{color:var(--ink);font-weight:700}
+.setup{transition:opacity .22s ease}
+.setup.dim{opacity:.3;pointer-events:none}
 .chips.left{justify-content:flex-start}
-.sheet .chip{padding:8px 13px}
+/* 단어장 드롭다운: 버튼에서 그대로 펼쳐진다 */
+.lpick{position:relative;padding:0 14px 8px}
+.lpick-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--chip-bg);border:1.5px solid transparent;border-radius:10px;padding:9px 12px;color:var(--ink);font-family:inherit;font-size:13.5px;cursor:pointer;transition:border-radius .18s ease,border-color .18s ease,background-color .18s ease}
+.lpick-l{display:flex;align-items:center;gap:8px;min-width:0}
+.lpick-l .k{flex:none;color:var(--muted);font-size:12px}
+.lpick-l b{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lpick-l .c{flex:none;color:var(--muted);font-family:var(--f-mono);font-size:12px}
+.lpick-car{color:var(--muted);transition:transform .24s cubic-bezier(.3,.7,.35,1),color .18s ease}
+.lpick-btn.open{background:var(--raised);border-color:var(--mint);border-bottom-color:var(--line);border-radius:12px 12px 0 0}
+.lpick-btn.open .lpick-car{transform:rotate(180deg);color:var(--mint)}
+.lpick-pop{position:absolute;z-index:10;left:14px;right:14px;top:calc(100% - 8px);background:var(--raised);border:1.5px solid var(--mint);border-top:none;border-radius:0 0 12px 12px;box-shadow:var(--shadow-2);padding:10px 12px 12px;transform-origin:top center}
+.lpick-pop.anim{animation:dropIn .26s cubic-bezier(.2,.8,.25,1) both}
+.lpick-pop.closing{animation:dropOut .16s ease-in forwards;pointer-events:none}
+@keyframes dropIn{from{opacity:0;transform:translateY(-10px) scaleY(.9)}to{opacity:1;transform:none}}
+@keyframes dropOut{to{opacity:0;transform:translateY(-8px) scaleY(.94)}}
+.lpick-search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:0 10px;color:var(--muted)}
+.lpick-search input{flex:1;min-width:0;background:none;border:none;color:var(--ink);padding:9px 0;outline:none;font-family:inherit}
+.lpick-sum{display:flex;align-items:center;justify-content:space-between;margin:10px 2px 4px;font-size:11.5px;color:var(--muted)}
+.lpick-all{background:none;border:none;color:var(--mint);font-size:12px;font-weight:600;cursor:pointer;padding:4px 0;font-family:inherit}
+.lpick-list{max-height:min(44vh,320px);overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}
+.lpick-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;border-top:1px solid var(--line-soft);padding:11px 2px;color:var(--ink);font-family:inherit;font-size:14px;text-align:left;cursor:pointer;transition:color .15s ease}
+.lpick-row .box{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-strong);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--on-mint);transition:background-color .15s ease,border-color .15s ease}
+.lpick-row.on{color:var(--mint);font-weight:700}
+.lpick-row.on .box{background:var(--mint);border-color:var(--mint)}
+.lpick-row.just .box{animation:boxPop .3s cubic-bezier(.3,1.6,.5,1)}
+@keyframes boxPop{from{transform:scale(.6)}to{transform:none}}
+.lpick-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lpick-row .c{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-weight:500}
+.lpick-none{font-size:12.5px;color:var(--faint);text-align:center;padding:14px 0;margin:0}
+.lpick-done{margin-top:8px;padding:12px}
+/* 막대 말풍선: 누른 막대에서 튀어나온다 (--cx = 꼬리 위치) */
+.tpop{--cx:50%;position:relative;z-index:5;margin-top:12px;background:var(--raised);border:1.5px solid var(--mint);border-radius:16px;box-shadow:var(--shadow-2);padding:14px 16px 16px;transform-origin:var(--cx) 0}
+.tpop-car{position:absolute;top:-8.5px;left:calc(var(--cx) - 7px);width:14px;height:14px;background:var(--raised);border-top:1.5px solid var(--mint);border-left:1.5px solid var(--mint);transform:rotate(45deg)}
+.tpop.anim{animation:bubbleIn .32s cubic-bezier(.2,.9,.3,1.18) both}
+.tpop.closing{animation:bubbleOut .15s ease-in forwards;pointer-events:none}
+@keyframes bubbleIn{from{opacity:0;transform:translateY(-8px) scale(.88)}to{opacity:1;transform:none}}
+@keyframes bubbleOut{to{opacity:0;transform:translateY(-6px) scale(.94)}}
+.tpop-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.tpop-t{font-family:var(--f-kr);font-size:17px;letter-spacing:.01em}
+.tpop-t b{font-family:var(--f-mono);font-size:18px;color:var(--mint)}
+.tpop-x{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:4px 0;font-family:inherit}
+.tpop-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.tpop .chips{margin-top:12px}
+.tpop .chips+.chips{margin-top:8px}
+.tpop .chip{padding:7px 12px}
+.tpop .pbtn{margin-top:14px;padding:13px}
+@media (prefers-reduced-motion:reduce){.lpick-pop.anim,.lpick-pop.closing,.tpop.anim,.tpop.closing,.lpick-row.just .box{animation:none !important}}
 .sum-split{display:flex;gap:14px;margin-top:10px;font-size:13px;color:var(--muted)}
 .sum-split b{font-family:var(--f-mono);color:var(--ink)}
 .sum-split .w b{color:var(--danger)}
@@ -1054,7 +1099,7 @@ var state = {
   session: null,
   bank: { search:'', sortKey:'wrong', sortDir:'desc', listId:null },
   setup: { dir:'en2ko', scope:'wrong', count:20, listIds:loadStudyLists(), wrongN:null },
-  tierSheet: null,
+  tierPop: null, listPick: null,
   menu: false,
   sheet: null,
   modal: null, listModal: null, csvModal: null, voiceModal: null, exportModal: null,
@@ -1119,6 +1164,7 @@ function switchTab(t){
   var v = document.getElementById('view');
   if(v){ v.style.overflowY='hidden'; v.scrollTop = 0; }
   state.tab = t;
+  state.tierPop = null; state.listPick = null;
   render();
   requestAnimationFrame(function(){ if(v){ v.scrollTop = 0; v.style.overflowY=''; } });
 }
@@ -1288,7 +1334,6 @@ function renderSheet(){
   if(!state.sheet){ root.innerHTML=''; return; }
   var kind = state.sheet, title = '', opts = [], current = '';
 
-  if(kind==='tier'){ renderTierSheet(root); return; }
   var multi = kind==='list', picked = studyListIds();
   if(kind==='list'){
     title = '단어장 (여러 개 선택 가능)';
@@ -1361,45 +1406,88 @@ function tierWords(tier){
   });
 }
 function tierLabel(tier){ return tier==='new' ? '아직 안 본 단어' : (tier===0 ? '안 틀린 단어' : tier+'번 틀린 단어'); }
-function openTierSheet(tier){
+// 분포 위젯의 두 오버레이: 단어장 드롭다운(listPick), 막대 말풍선(tierPop).
+// anim 은 열릴 때 한 번만 재생하고, 닫을 때는 closing 애니메이션 뒤에 상태를 지운다.
+function reduceMotion(){ try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
+function openTierPop(tier){
   var n = tierWords(tier).length; if(!n) return;
-  state.tierSheet = { tier: tier, count: Math.min(state.setup.count > 0 ? state.setup.count : 20, n) };
-  openSheet('tier');
+  state.listPick = null;
+  state.tierPop = { tier: tier, count: Math.min(state.setup.count > 0 ? state.setup.count : 20, n), anim: true };
+  render();
 }
-function renderTierSheet(root){
-  var t = state.tierSheet; if(!t){ state.sheet = null; root.innerHTML=''; return; }
+function openListPick(){
+  state.tierPop = null;
+  state.listPick = { q:'', anim:true };
+  render();
+}
+function closeOverlay(kind, after){
+  var el = view.querySelector(kind==='list' ? '.lpick-pop' : '.tpop');
+  var done = function(){
+    if(kind==='list') state.listPick = null; else state.tierPop = null;
+    if(after) after(); else render();
+  };
+  if(!el || el.classList.contains('closing') || reduceMotion()){ if(!el || !el.classList.contains('closing')) done(); return; }
+  el.classList.remove('anim'); el.classList.add('closing');
+  if(kind==='list'){ var b = view.querySelector('.lpick-btn'); if(b) b.classList.remove('open'); }
+  else { var c = view.querySelector('.dist-col.on'); if(c) c.classList.remove('on'); }
+  var dim = view.querySelector('.setup.dim'); if(dim) dim.classList.remove('dim');
+  setTimeout(done, 160);
+}
+function listPickHtml(picked){
+  var lp = state.listPick, open = !!lp;
+  var total = wordsInLists(picked).length;
+  var html = '<div class="lpick">'
+    + '<button class="lpick-btn'+(open?' open':'')+'" id="lpickBtn" aria-expanded="'+open+'">'
+    + '<span class="lpick-l"><span class="k">단어장</span><b>'+escapeHtml(listsLabel(picked))+'</b><span class="c">'+total+'</span></span>'
+    + '<span class="lpick-car" aria-hidden="true">▾</span></button>';
+  if(open){
+    var q = (lp.q||'').trim().toLowerCase(), shown = 0;
+    // 고른 단어장을 위로
+    var rows = Store.lists.slice().sort(function(a,b){ return (picked.indexOf(b.id)>-1) - (picked.indexOf(a.id)>-1); });
+    var rowsHtml = rows.map(function(l){
+      var on = picked.indexOf(l.id) > -1;
+      var hide = q && l.name.toLowerCase().indexOf(q)===-1;
+      if(!hide) shown++;
+      return '<button class="lpick-row'+(on?' on':'')+(lp.just===l.id?' just':'')+'" data-l="'+l.id+'" data-name="'+escapeHtml(l.name.toLowerCase())+'"'+(hide?' hidden':'')+'>'
+        + '<span class="box" aria-hidden="true">'+(on?'✓':'')+'</span><span class="nm">'+escapeHtml(l.name)+'</span><span class="c">'+wordsInList(l.id).length+'</span></button>';
+    }).join('');
+    html += '<div class="lpick-pop'+(lp.anim?' anim':'')+'">'
+      + '<label class="lpick-search"><span aria-hidden="true">⌕</span><input type="text" id="lpickQ" placeholder="단어장 이름 검색" aria-label="단어장 이름 검색" value="'+escapeHtml(lp.q||'')+'"></label>'
+      + '<div class="lpick-sum"><span>'+(picked.length ? picked.length+'개 선택' : '전체')+' · 단어 '+total+'개</span>'
+      + (picked.length ? '<button class="lpick-all" id="lpickAll">전체로 보기</button>' : '')+'</div>'
+      + '<div class="lpick-list" id="lpickList">'+rowsHtml
+      + '<p class="lpick-none"'+(shown?' hidden':'')+'>검색 결과가 없어요</p></div>'
+      + '<button class="pbtn lpick-done" id="lpickDone">완료</button>'
+      + '</div>';
+  }
+  return html + '</div>';
+}
+function tierPopHtml(){
+  var t = state.tierPop; if(!t) return '';
   var pool = tierWords(t.tier);
-  if(!pool.length){ state.sheet = null; state.tierSheet = null; root.innerHTML=''; return; }
+  if(!pool.length){ state.tierPop = null; return ''; }
   if(t.count > pool.length) t.count = pool.length;
   var unseen = pool.filter(function(w){ return !w.lastSeen; }).length;
   var countOpts = [10,20,30,50].filter(function(n){ return n < pool.length; });
-  root.innerHTML = '<div class="back" id="sheetBack"><div class="sheet">'
-    + '<div class="grab"></div>'
-    + '<div class="sheet-t"><h3>'+escapeHtml(tierLabel(t.tier))+'</h3><button class="cancel" id="sheetClose">닫기</button></div>'
-    + '<div class="tier-sum"><b>'+pool.length+'</b>개 <span>'+escapeHtml(listsLabel(studyListIds()))+'</span>'
-    + '<div class="tier-sub">'+(unseen ? '이번 회차에 안 본 단어 '+unseen+'개부터 나와요' : '전부 한 번씩 봤어요. 오래전에 본 단어부터 나와요')+'</div></div>'
-    + '<div class="tier-k">방향</div><div class="chips left" id="tierDir">'
+  return '<div class="tpop'+(t.anim?' anim':'')+'" id="tpop"><i class="tpop-car" aria-hidden="true"></i>'
+    + '<div class="tpop-h"><div class="tpop-t">'+escapeHtml(tierLabel(t.tier))+' <b>'+pool.length+'</b>개</div><button class="tpop-x" id="tpopClose">닫기</button></div>'
+    + '<div class="tpop-sub">'+escapeHtml(listsLabel(studyListIds()))+' · '+(unseen ? '이번 회차에 안 본 단어 '+unseen+'개부터' : '오래전에 본 단어부터')+'</div>'
+    + '<div class="chips left" id="tierDir">'
     + DIRS.map(function(d){ return '<button class="chip kr'+(state.setup.dir===d.v?' on':'')+'" data-d="'+d.v+'">'+d.label+'</button>'; }).join('')
     + '</div>'
-    + '<div class="tier-k">문제 수</div><div class="chips left" id="tierCount">'
+    + '<div class="chips left" id="tierCount">'
     + countOpts.map(function(n){ return '<button class="chip'+(t.count===n?' on':'')+'" data-n="'+n+'">'+n+'</button>'; }).join('')
     + '<button class="chip kr'+(t.count===pool.length?' on':'')+'" data-n="'+pool.length+'">전체 '+pool.length+'</button>'
     + '</div>'
     + '<button class="pbtn" id="tierStart">'+t.count+'문제 학습 시작</button>'
-    + '</div></div>';
-  document.getElementById('sheetBack').onclick = function(e){ if(e.target.id==='sheetBack') closeSheet(); };
-  document.getElementById('sheetClose').onclick = closeSheet;
-  document.getElementById('tierDir').onclick = function(e){
-    var b = e.target.closest('[data-d]'); if(!b) return; state.setup.dir = b.dataset.d; render();
-  };
-  document.getElementById('tierCount').onclick = function(e){
-    var b = e.target.closest('[data-n]'); if(!b) return; t.count = parseInt(b.dataset.n,10); render();
-  };
-  document.getElementById('tierStart').onclick = function(){
-    state.sheet = null; state.tierSheet = null;
-    beginSession(pool, 'tier', t.count);
-  };
+    + '</div>';
 }
+// 오버레이 바깥을 누르면 닫는다
+document.addEventListener('click', function(e){
+  if(state.tab!=='study' || state.session) return;
+  if(state.listPick && !e.target.closest('.lpick')) closeOverlay('list');
+  else if(state.tierPop && !e.target.closest('.tpop') && !e.target.closest('.dist-col')) closeOverlay('tier');
+});
 
 /* ---------------- study tab ---------------- */
 function renderStudyTab(){
@@ -1432,11 +1520,9 @@ function renderStudyTab(){
   if(state.setup.count > pool.length) state.setup.count = pool.length;
   if(state.setup.count <= 0 && pool.length) state.setup.count = Math.min(20, pool.length);
 
-  var reviewCount = scoped.filter(function(w){ return (w.wrongCount||0) >= 3; }).length;
-  var perfect = scoped.filter(function(w){ return (w.wrongCount||0)===0 && (w.correctCount||0) > 0; }).length;
-
   var countOpts = [10,20,30,50].filter(function(n){ return n < pool.length; });
-  var unseenCount = pool.filter(function(w){ return !w.lastSeen; }).length;
+  var tp = state.tierPop, lp = state.listPick;
+  var opening = !!((tp && tp.anim) || (lp && lp.anim));
 
   var distHtml = (function(){
     var dist = [0,0,0,0,0,0], fresh = 0;
@@ -1445,33 +1531,23 @@ function renderStudyTab(){
       else dist[clampWrong(w.wrongCount)]++;
     });
     var max = Math.max.apply(null, dist.concat([fresh])) || 1;
-    var freshCol = fresh ? '<button class="dist-col fresh" data-tier="new" aria-label="안 본 단어 '+fresh+'개 학습"><span class="dist-v">'+fresh+'</span>'
+    var freshCol = fresh ? '<button class="dist-col fresh'+(tp && tp.tier==='new'?' on':'')+'" data-tier="new" aria-label="안 본 단어 '+fresh+'개 학습"><span class="dist-v">'+fresh+'</span>'
       + '<span class="dist-track"><span class="dist-bar" style="height:'+Math.max(4, Math.round(fresh/max*100))+'%"></span></span>'
       + '<span class="dist-k">미학습</span></button>' : '';
-    var listChips = '<div class="dist-lists" id="distLists">'
-      + '<button class="lchip'+(picked.length?'':' on')+'" data-l="">전체 <span class="c">'+Store.words.length+'</span></button>'
-      + Store.lists.map(function(l){
-          return '<button class="lchip'+(picked.indexOf(l.id)>-1?' on':'')+'" data-l="'+l.id+'">'+escapeHtml(l.name)+' <span class="c">'+wordsInList(l.id).length+'</span></button>';
-        }).join('')
-      + '</div>';
-    return '<div class="dist"><div class="setup-h"><div class="setup-title">틀린 횟수 분포</div><span class="dist-sub">'+scoped.length+'개 · 막대를 눌러 학습</span></div>'
-      + listChips
+    return '<div class="dist'+(lp?' ov':'')+'"><div class="setup-h"><div class="setup-title">틀린 횟수 분포</div></div>'
+      + listPickHtml(picked)
       + '<div class="dist-cols" style="grid-template-columns:repeat('+(fresh?7:6)+',minmax(0,1fr))">' + freshCol + dist.map(function(c,n){
-          return '<button class="dist-col'+(c?'':' zero')+'" data-tier="'+n+'"'+(c?'':' disabled')+' aria-label="'+n+'번 틀린 단어 '+c+'개 학습">'
+          return '<button class="dist-col'+(c?'':' zero')+(tp && tp.tier===n?' on':'')+'" data-tier="'+n+'"'+(c?'':' disabled')+' aria-label="'+n+'번 틀린 단어 '+c+'개 학습">'
             + '<span class="dist-v">'+c+'</span>'
             + '<span class="dist-track"><span class="dist-bar heat-'+heatLevel(n)+'" style="height:'+(c ? Math.max(4, Math.round(c/max*100)) : 0)+'%"></span></span>'
             + '<span class="dist-k">'+n+'번</span></button>';
         }).join('') + '</div></div>';
   })();
 
-  var html = '<div class="statline">'
-    + '<b>'+scoped.length+'</b><span>단어</span><span class="dot">·</span>'
-    + '<span class="w">'+reviewCount+'</span><span>복습 필요</span><span class="dot">·</span>'
-    + '<span class="g">'+perfect+'</span><span>완벽</span>'
-    + '</div>'
-    + '<div class="wrap setup-outer">'
+  var html = '<div class="wrap setup-outer">'
     + distHtml
-    + '<div class="setup">'
+    + tierPopHtml()
+    + '<div class="setup'+((tp||lp) && !opening ? ' dim' : '')+'" id="setupCard">'
     + '<div class="setup-h"><div class="setup-title">오늘 학습</div></div>'
     + '<button class="row" data-sheet="list"><span class="row-k">단어장</span><span class="row-v">'
       + escapeHtml(listsLabel(picked))
@@ -1488,8 +1564,7 @@ function renderStudyTab(){
       + (pool.length ? '<button class="chip kr'+(state.setup.count===pool.length?' on':'')+'" data-n="'+pool.length+'">전체</button>' : '')
       + '</span></div>'
     + '<div class="start-wrap"><button class="start" id="startBtn"'+(pool.length===0?' disabled':'')+'>'
-      + '<div class="n">'+(pool.length ? state.setup.count+'문제'+(unseenCount ? ' · 안 본 단어 '+unseenCount+'개부터' : '') : '학습할 단어 없음')+'</div>'
-      + '<div class="t">학습 시작</div></button></div>'
+      + '<div class="t">'+(pool.length ? '학습 시작' : '학습할 단어 없음')+'</div></button></div>'
     + '</div>'
     + (pool.length===0 ? '<p class="note">'+(state.setup.scope==='new' ? '이미 전부 한 번 이상 학습했어요. 범위를 바꿔보세요.' : '이 조건에 맞는 단어가 없어요.')+'</p>' : '')
     + '</div>';
@@ -1499,13 +1574,61 @@ function renderStudyTab(){
   view.querySelectorAll('[data-sheet]').forEach(function(b){
     b.onclick = function(){ openSheet(b.dataset.sheet); };
   });
-  document.getElementById('distLists').onclick = function(e){
-    var b = e.target.closest('[data-l]'); if(!b) return;
-    toggleStudyList(b.dataset.l); render();
-  };
+  // 단어장 드롭다운
+  document.getElementById('lpickBtn').onclick = function(){ if(state.listPick) closeOverlay('list'); else openListPick(); };
+  if(lp){
+    var qEl = document.getElementById('lpickQ'), listEl = document.getElementById('lpickList');
+    if(lp.scroll) listEl.scrollTop = lp.scroll;
+    lp.anim = false; lp.just = null;
+    qEl.oninput = function(){
+      lp.q = qEl.value;
+      var q = qEl.value.trim().toLowerCase(), shown = 0;
+      listEl.querySelectorAll('.lpick-row').forEach(function(r){ var ok = !q || r.dataset.name.indexOf(q) > -1; r.hidden = !ok; if(ok) shown++; });
+      listEl.querySelector('.lpick-none').hidden = shown > 0;
+    };
+    listEl.onclick = function(e){
+      var r = e.target.closest('[data-l]'); if(!r) return;
+      lp.scroll = listEl.scrollTop; lp.just = r.dataset.l;
+      toggleStudyList(r.dataset.l); render();
+    };
+    var allBtn = document.getElementById('lpickAll');
+    if(allBtn) allBtn.onclick = function(){ lp.scroll = listEl.scrollTop; toggleStudyList(''); render(); };
+    document.getElementById('lpickDone').onclick = function(){ closeOverlay('list'); };
+  }
+  // 막대 → 말풍선
   view.querySelectorAll('.dist-col[data-tier]').forEach(function(b){
-    b.onclick = function(){ var v = b.dataset.tier; openTierSheet(v==='new' ? 'new' : parseInt(v,10)); };
+    b.onclick = function(){
+      var v = b.dataset.tier, tier = v==='new' ? 'new' : parseInt(v,10);
+      if(state.tierPop && state.tierPop.tier===tier) closeOverlay('tier'); else openTierPop(tier);
+    };
   });
+  var pop = document.getElementById('tpop');
+  if(pop){
+    var col = view.querySelector('.dist-col.on');
+    if(col){
+      // 말풍선은 등장 애니메이션 중 scale 이 걸려 있으니, 변형 없는 부모 기준으로 꼬리 위치를 잰다
+      var wrap = pop.parentElement, wr = wrap.getBoundingClientRect(), cr = col.getBoundingClientRect();
+      var left = wr.left + (parseFloat(getComputedStyle(wrap).paddingLeft) || 0), w = pop.offsetWidth;
+      pop.style.setProperty('--cx', Math.max(20, Math.min(w-20, cr.left + cr.width/2 - left)) + 'px');
+    }
+    if(tp.anim){
+      tp.anim = false;
+      setTimeout(function(){ pop.scrollIntoView({ block:'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' }); }, 60);
+    }
+    document.getElementById('tpopClose').onclick = function(){ closeOverlay('tier'); };
+    document.getElementById('tierDir').onclick = function(e){
+      var b = e.target.closest('[data-d]'); if(!b) return; state.setup.dir = b.dataset.d; render();
+    };
+    document.getElementById('tierCount').onclick = function(e){
+      var b = e.target.closest('[data-n]'); if(!b) return; tp.count = parseInt(b.dataset.n,10); render();
+    };
+    document.getElementById('tierStart').onclick = function(){
+      var t = state.tierPop; state.tierPop = null;
+      beginSession(tierWords(t.tier), 'tier', t.count);
+    };
+  }
+  // 오버레이가 막 열렸으면 아래 카드를 서서히 흐리게
+  if(opening){ var sc = document.getElementById('setupCard'); if(sc){ void sc.offsetWidth; sc.classList.add('dim'); } }
   var chips = document.getElementById('countChips');
   if(chips) chips.onclick = function(e){
     var b = e.target.closest('[data-n]'); if(!b) return;
@@ -1519,6 +1642,7 @@ function startSession(){
   beginSession(scopeFilteredWords(studyListIds(), state.setup.scope), state.setup.scope, state.setup.count);
 }
 function beginSession(source, scope, count){
+  state.tierPop = null; state.listPick = null;
   var pool = source.map(function(w){ return [Math.random(), w]; }).sort(function(a,b){ return a[0]-b[0]; }).map(function(p){ return p[1]; });
   // 같은 조건으로 여러 번 학습해도 겹치지 않게, 오래전에 본 단어부터 낸다 (랜덤 범위만 예외)
   var seen = function(a,b){ return (a.lastSeen||0) - (b.lastSeen||0); };
@@ -1543,7 +1667,7 @@ function currentWordLive(id){ return Store.words.find(function(w){ return w.id==
 function wrongTag(id){
   var w = currentWordLive(id);
   var wrong = w.wrongCount||0, right = w.correctCount||0;
-  var label = wrong>0 ? wrong+'번 틀림' : (right>0 ? '틀린 적 없음' : '처음 보는 단어');
+  var label = wrong>0 ? wrong+'번' : (right>0 ? '틀린 적 없음' : '처음 보는 단어');
   return '<span class="tag h'+heatLevel(wrong)+'">'+label+'</span>';
 }
 
@@ -1578,16 +1702,14 @@ function renderSession(){
         + (item.example ? answerExampleHtml(item.example, item.word) : '')
         + (sa.syn ? '<div class="sa syn"><b>동</b><span>'+escapeHtml(sa.syn)+'</span></div>' : '')
         + (sa.ant ? '<div class="sa ant"><b>반</b><span>'+escapeHtml(sa.ant)+'</span></div>' : '')
-        + '<div class="tip">밑줄 있는 단어·예문을 탭하면 발음이 나와요</div>'
         + '</div>'
       : '<div class="card front" id="cardFront">'+frontCardHtml(item, true)+'</div>')
     + '</div></div></div>'
-    + '<div class="grade3"'+(s.revealed?'':' style="visibility:hidden"')+'>'
-    + '<button class="g3 up" data-grade="up" title="틀린 횟수 올림 (←)"><span class="gbtn no">＋1</span><span class="g3l">← 올림</span></button>'
-    + '<button class="g3 down" data-grade="down" title="틀린 횟수 내림 (↓)"><span class="gbtn ok">－1</span><span class="g3l">↓ 내림</span></button>'
-    + '<button class="g3 hold" data-grade="keep" title="그대로 두기 (→)"><span class="gbtn hold">＝</span><span class="g3l">유지 →</span></button>'
-    + '</div>'
-    + (s.revealed ? '<div class="ghint">카드를 밀어도 채점돼요</div>' : '');
+    + '<div class="gradeA'+(s.revealed?'':' off')+'">'
+    + '<button class="ga up" data-grade="up" title="틀린 횟수 올림 (←)"><b>＋1</b><span>← 올림</span></button>'
+    + '<button class="ga down" data-grade="down" title="틀린 횟수 내림 (↓)"><b>－1</b><span>↓ 내림</span></button>'
+    + '<button class="ga hold" data-grade="keep" title="그대로 두기 (→)"><b>○</b><span>유지 →</span></button>'
+    + '</div>';
 
   view.innerHTML = html;
   document.getElementById('quitBtn').onclick = function(){ state.session = null; render(); };
@@ -1625,7 +1747,7 @@ function renderSession(){
     var hs = document.getElementById('hintSynBtn');
     if(hs) hs.onclick = function(e){ e.stopPropagation(); item.hintSyn = true; render(); };
   } else {
-    view.querySelectorAll('.g3[data-grade]').forEach(function(b){
+    view.querySelectorAll('.ga[data-grade]').forEach(function(b){
       b.onclick = function(){ flingCard(swipeEl, b.dataset.grade); };
     });
     bindSpeakables(view);
@@ -1654,7 +1776,7 @@ function frontCardHtml(item, interactive){
     + '<div class="'+cls+'">'+escapeHtml(front)+'</div>'
     + hintsHtml
     + (hintBtns ? '<div class="hints">'+hintBtns+'</div>' : '')
-    + '<div class="reveal">탭 → 정답 · 밀어서 채점 (← 올림 · ↓ 내림 · → 유지)</div>';
+    ;
 }
 
 // kind: 'up' 틀린 횟수 +1 (왼쪽) · 'down' -1 (아래) · 'keep' 그대로 (오른쪽)
@@ -1668,6 +1790,8 @@ function flingCard(card, kind){
   if(!card || card.dataset.flinging) return;
   card.dataset.flinging = '1';
   tintCard(document.getElementById('cardBack'), kind, 1, true);
+  var gb = document.querySelector('.ga[data-grade="'+kind+'"]');
+  if(gb) gb.classList.add('hit');
   card.style.transition = 'transform .72s cubic-bezier(.36,.62,.4,1), opacity .72s ease';
   card.style.transform = GRADE_FLING[kind];
   card.style.opacity = '0';
