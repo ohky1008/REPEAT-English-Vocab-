@@ -471,7 +471,11 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .dist-col{background:none;border:none;padding:6px 0 4px;border-radius:10px;cursor:pointer;color:inherit;font-family:inherit;transition:background-color .2s ease,box-shadow .2s ease}
 .dist-col:hover{background:var(--hover)}
 .dist-col:disabled{cursor:default;background:none}
-.dist-col.on{background:var(--mint-soft);box-shadow:inset 0 0 0 1.5px var(--mint)}
+.dist-col{position:relative}
+.dist-col.on{background:var(--mint-soft)}
+/* 하이라이트 테두리는 막대 트랙 위에 그린다 */
+.dist-col.on::after{content:'';position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 0 0 1.5px var(--mint);pointer-events:none;z-index:1;animation:hlIn .22s ease both}
+@keyframes hlIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
 .dist-col.on .dist-k{color:var(--ink);font-weight:700}
 .setup{transition:opacity .22s ease}
 .setup.dim{opacity:.3;pointer-events:none}
@@ -479,6 +483,9 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 /* 단어장 드롭다운: 버튼에서 그대로 펼쳐진다 */
 .lpick{position:relative;padding:0 14px 8px}
 .lpick-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--chip-bg);border:1.5px solid transparent;border-radius:10px;padding:9px 12px;color:var(--ink);font-family:inherit;font-size:13.5px;cursor:pointer;transition:border-radius .18s ease,border-color .18s ease,background-color .18s ease}
+/* 길게 눌러도 글자 선택·돋보기가 뜨지 않고, 눌림 효과로 크기가 줄지 않게 (열린 목록과 붙어 있어야 함) */
+.lpick,.lpick-btn,.dist-col,.ga{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.lpick-btn.tap{scale:1;filter:brightness(.92)}
 .lpick-l{display:flex;align-items:center;gap:8px;min-width:0}
 .lpick-l .k{flex:none;color:var(--muted);font-size:12px}
 .lpick-l b{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -487,10 +494,13 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .lpick-btn.open{background:var(--raised);border-color:var(--mint);border-bottom-color:var(--line);border-radius:12px 12px 0 0}
 .lpick-btn.open .lpick-car{transform:rotate(180deg);color:var(--mint)}
 .lpick-pop{position:absolute;z-index:10;left:14px;right:14px;top:calc(100% - 8px);background:var(--raised);border:1.5px solid var(--mint);border-top:none;border-radius:0 0 12px 12px;box-shadow:var(--shadow-2);padding:10px 12px 12px;transform-origin:top center}
-.lpick-pop.anim{animation:dropIn .26s cubic-bezier(.2,.8,.25,1) both}
-.lpick-pop.closing{animation:dropOut .16s ease-in forwards;pointer-events:none}
-@keyframes dropIn{from{opacity:0;transform:translateY(-10px) scaleY(.9)}to{opacity:1;transform:none}}
-@keyframes dropOut{to{opacity:0;transform:translateY(-8px) scaleY(.94)}}
+/* 버튼 아래에서 위→아래로 펼쳐지듯: 위쪽부터 잘라내던 영역을 아래로 넓히고, 내용은 살짝 따라 내려온다 */
+.lpick-pop.anim{animation:dropIn .34s cubic-bezier(.22,.9,.3,1) both}
+.lpick-pop.anim>*{animation:dropItem .34s cubic-bezier(.22,.9,.3,1) both}
+.lpick-pop.closing{animation:dropOut .2s cubic-bezier(.5,0,.75,0) forwards;pointer-events:none}
+@keyframes dropIn{from{clip-path:inset(0 -20px 100% -20px);opacity:.6}to{clip-path:inset(0 -20px -40px -20px);opacity:1}}
+@keyframes dropItem{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@keyframes dropOut{from{clip-path:inset(0 -20px -40px -20px)}to{clip-path:inset(0 -20px 100% -20px);opacity:.4}}
 .lpick-search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:0 10px;color:var(--muted)}
 .lpick-search input{flex:1;min-width:0;background:none;border:none;color:var(--ink);padding:9px 0;outline:none;font-family:inherit}
 .lpick-sum{display:flex;align-items:center;justify-content:space-between;margin:10px 2px 4px;font-size:11.5px;color:var(--muted)}
@@ -522,7 +532,7 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .tpop .chips+.chips{margin-top:8px}
 .tpop .chip{padding:7px 12px}
 .tpop .pbtn{margin-top:14px;padding:13px}
-@media (prefers-reduced-motion:reduce){.lpick-pop.anim,.lpick-pop.closing,.tpop.anim,.tpop.closing,.lpick-row.just .box{animation:none !important}}
+@media (prefers-reduced-motion:reduce){.lpick-pop.anim,.lpick-pop.anim>*,.lpick-pop.closing,.tpop.anim,.tpop.closing,.lpick-row.just .box,.dist-col.on::after{animation:none !important}}
 .sum-split{display:flex;gap:14px;margin-top:10px;font-size:13px;color:var(--muted)}
 .sum-split b{font-family:var(--f-mono);color:var(--ink)}
 .sum-split .w b{color:var(--danger)}
@@ -1431,7 +1441,7 @@ function closeOverlay(kind, after){
   if(kind==='list'){ var b = view.querySelector('.lpick-btn'); if(b) b.classList.remove('open'); }
   else { var c = view.querySelector('.dist-col.on'); if(c) c.classList.remove('on'); }
   var dim = view.querySelector('.setup.dim'); if(dim) dim.classList.remove('dim');
-  setTimeout(done, 160);
+  setTimeout(done, kind==='list' ? 200 : 160);
 }
 function listPickHtml(picked){
   var lp = state.listPick, open = !!lp;
