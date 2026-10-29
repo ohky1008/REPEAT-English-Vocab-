@@ -21,8 +21,12 @@ create table if not exists public.words (
   syn_ant text,
   wrong_count int not null default 0,
   correct_count int not null default 0,
+  last_seen_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- 이미 만든 테이블에 '마지막 학습 시각' 열 추가 (같은 조건 반복 학습 시 안 본 단어부터 출제)
+alter table public.words add column if not exists last_seen_at timestamptz;
 
 create index if not exists words_user_id_idx on public.words(user_id);
 create index if not exists words_list_id_idx on public.words(list_id);

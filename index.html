@@ -452,6 +452,36 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .auth-note{font-size:11px;color:var(--faint);margin-top:14px;line-height:1.6}
 .pw-wrap{position:relative}
 .pw-wrap button{position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer}
+
+/* 3방향 채점 (← 올림 · ↓ 내림 · → 유지) */
+.grade3{display:flex;align-items:flex-start;justify-content:space-between;padding:0 24px 4px}
+.g3{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;padding:0;cursor:pointer;color:var(--muted);font-family:inherit}
+.g3 .gbtn{width:50px;height:50px;font-size:16px}
+.g3l{font-size:11.5px;font-weight:600}
+.g3.up .g3l{color:var(--danger)}
+.g3.down .g3l{color:var(--mint)}
+.gbtn.hold{background:var(--chip-bg);color:var(--ink-2)}
+.grade3+.ghint{padding:2px 0 14px}
+/* 분포 막대 = 버튼, 위젯 안 단어장 선택 */
+.dist{margin-top:14px}
+.dist-col{background:none;border:none;padding:6px 0 4px;border-radius:10px;cursor:pointer;color:inherit;font-family:inherit}
+.dist-col:hover{background:var(--hover)}
+.dist-col:disabled{cursor:default;background:none}
+.dist-lists{display:flex;gap:6px;padding:0 14px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x}
+.dist-lists .lchip{background:var(--chip-bg)}
+.dist-lists .lchip.on{background:var(--mint-soft);color:var(--ink);font-weight:700;box-shadow:inset 0 0 0 1px var(--mint)}
+/* 막대를 눌렀을 때 뜨는 학습 시트 */
+.tier-sum{font-size:14px;color:var(--ink-2);margin-bottom:6px}
+.tier-sum b{font-family:var(--f-mono);font-size:26px;color:var(--ink);margin-right:2px}
+.tier-sum span{color:var(--muted);font-size:12.5px;margin-left:6px}
+.tier-sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.tier-k{font-size:11.5px;color:var(--muted);margin:16px 0 7px}
+.chips.left{justify-content:flex-start}
+.sheet .chip{padding:8px 13px}
+.sum-split{display:flex;gap:14px;margin-top:10px;font-size:13px;color:var(--muted)}
+.sum-split b{font-family:var(--f-mono);color:var(--ink)}
+.sum-split .w b{color:var(--danger)}
+.sum-split .g b{color:var(--mint)}
 </style>
 </head>
 <body>
@@ -893,12 +923,20 @@ function buildCsvText(words, includeListCol){
 }
 
 /* ---------------- store ---------------- */
+// 마지막 학습 시각: DB의 last_seen_at 열이 있으면 거기에, 항상 이 기기 localStorage에도 저장
+var seenMap = (function(){ try{ return JSON.parse(localStorage.getItem('repeat_seen')||'{}') || {}; }catch(e){ return {}; } })();
+function markSeenLocal(id, t){
+  seenMap[id] = t;
+  try{ localStorage.setItem('repeat_seen', JSON.stringify(seenMap)); }catch(e){}
+}
 function rowToWord(r){
+  var dbSeen = r.last_seen_at ? new Date(r.last_seen_at).getTime() : 0;
   return {
     id: r.id, listId: r.list_id, word: r.word, pos: r.pos, meaning: r.meaning,
     example: r.example || '', synAnt: r.syn_ant || '',
     wrongCount: clampWrong(r.wrong_count), correctCount: r.correct_count||0,
-    createdAt: r.created_at ? new Date(r.created_at).getTime() : 0
+    createdAt: r.created_at ? new Date(r.created_at).getTime() : 0,
+    lastSeen: Math.max(dbSeen, seenMap[r.id]||0)
   };
 }
 function wordToRow(data, userId){
@@ -911,13 +949,14 @@ function wordToRow(data, userId){
   if(data.listId!==undefined) row.list_id = data.listId;
   if(data.wrongCount!==undefined) row.wrong_count = clampWrong(data.wrongCount);
   if(data.correctCount!==undefined) row.correct_count = data.correctCount;
+  if(data.lastSeen!==undefined && Store.hasSeenCol) row.last_seen_at = new Date(data.lastSeen).toISOString();
   if(userId) row.user_id = userId;
   return row;
 }
 function rowToList(r){ return { id:r.id, name:r.name, createdAt: r.created_at ? new Date(r.created_at).getTime() : 0 }; }
 
 var Store = {
-  words: [], lists: [], listeners: [], userId: null, ready: false, wordsChannel: null, listsChannel: null,
+  words: [], lists: [], listeners: [], userId: null, ready: false, wordsChannel: null, listsChannel: null, hasSeenCol: false,
   onChange: function(cb){ this.listeners.push(cb); },
   emit: function(){ this.listeners.forEach(function(fn){ fn(); }); },
   initForUser: async function(userId){
@@ -927,6 +966,7 @@ var Store = {
     if(listsRes.error) showError(listsRes.error.message);
     if(wordsRes.error) showError(wordsRes.error.message);
     this.lists = (listsRes.data||[]).map(rowToList);
+    this.hasSeenCol = !!(wordsRes.data && wordsRes.data.length && ('last_seen_at' in wordsRes.data[0]));
     this.words = (wordsRes.data||[]).map(rowToWord);
     this.ready = true;
     this.subscribeRealtime();
@@ -974,7 +1014,14 @@ var Store = {
     if(res.error) showError(res.error.message);
     return {};
   },
-  update: function(id, patch){ this.updateAsync(id, patch); },
+  update: function(id, patch){
+    if(patch.lastSeen!==undefined){
+      markSeenLocal(id, patch.lastSeen);
+      var w = this.words.find(function(x){ return x.id===id; });
+      if(w) w.lastSeen = patch.lastSeen;
+    }
+    this.updateAsync(id, patch);
+  },
   updateAsync: async function(id, patch){
     var res = await sb.from('words').update(wordToRow(patch, null)).eq('id', id);
     if(res.error) showError(res.error.message);
@@ -1006,7 +1053,8 @@ var state = {
   tab: 'study',
   session: null,
   bank: { search:'', sortKey:'wrong', sortDir:'desc', listId:null },
-  setup: { dir:'en2ko', scope:'wrong', count:20, listId:null, wrongN:null },
+  setup: { dir:'en2ko', scope:'wrong', count:20, listIds:loadStudyLists(), wrongN:null },
+  tierSheet: null,
   menu: false,
   sheet: null,
   modal: null, listModal: null, csvModal: null, voiceModal: null, exportModal: null,
@@ -1036,8 +1084,31 @@ function listName(id){
 function wordsInList(listId){
   return listId ? Store.words.filter(function(w){ return w.listId===listId; }) : Store.words;
 }
-function scopeFilteredWords(listId, scope){
-  var base = wordsInList(listId);
+// 학습 탭은 단어장을 여러 개 고를 수 있다 (빈 배열 = 전체)
+function loadStudyLists(){ try{ var v = JSON.parse(localStorage.getItem('repeat_study_lists')||'[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } }
+function saveStudyLists(){ try{ localStorage.setItem('repeat_study_lists', JSON.stringify(state.setup.listIds)); }catch(e){} }
+function studyListIds(){
+  state.setup.listIds = state.setup.listIds.filter(function(id){ return Store.lists.some(function(l){ return l.id===id; }); });
+  return state.setup.listIds;
+}
+function wordsInLists(ids){
+  if(!ids || !ids.length) return Store.words;
+  return Store.words.filter(function(w){ return ids.indexOf(w.listId) > -1; });
+}
+function toggleStudyList(id){
+  var ids = studyListIds();
+  if(!id) state.setup.listIds = [];
+  else if(ids.indexOf(id) > -1) state.setup.listIds = ids.filter(function(x){ return x!==id; });
+  else state.setup.listIds = ids.concat([id]);
+  saveStudyLists();
+}
+function listsLabel(ids){
+  if(!ids || !ids.length) return '전체';
+  if(ids.length===1) return listName(ids[0]);
+  return listName(ids[0])+' 외 '+(ids.length-1)+'개';
+}
+function scopeFilteredWords(listIds, scope){
+  var base = wordsInLists(listIds);
   if(scope==='new') return base.filter(function(w){ return !(w.wrongCount>0) && !(w.correctCount>0); });
   if(scope==='wrongN') return base.filter(function(w){ return (w.wrongCount||0)===state.setup.wrongN; });
   return base;
@@ -1217,11 +1288,12 @@ function renderSheet(){
   if(!state.sheet){ root.innerHTML=''; return; }
   var kind = state.sheet, title = '', opts = [], current = '';
 
+  if(kind==='tier'){ renderTierSheet(root); return; }
+  var multi = kind==='list', picked = studyListIds();
   if(kind==='list'){
-    title = '단어장';
+    title = '단어장 (여러 개 선택 가능)';
     opts.push({v:'', label:'전체', sub:wordsInList(null).length+'개'});
     Store.lists.forEach(function(l){ opts.push({v:l.id, label:l.name, sub:wordsInList(l.id).length+'개'}); });
-    current = state.setup.listId || '';
   } else if(kind==='dir'){
     title = '방향'; opts = DIRS.map(function(d){ return {v:d.v, label:d.label, sub:d.sub}; }); current = state.setup.dir;
   } else if(kind==='scope'){
@@ -1229,7 +1301,7 @@ function renderSheet(){
   } else if(kind==='wrongN'){
     title = '몇 번 틀린 단어?';
     var counts = {};
-    wordsInList(state.setup.listId).forEach(function(w){ var n=w.wrongCount||0; counts[n]=(counts[n]||0)+1; });
+    wordsInLists(picked).forEach(function(w){ var n=w.wrongCount||0; counts[n]=(counts[n]||0)+1; });
     opts = Object.keys(counts).map(Number).sort(function(a,b){return a-b;}).map(function(n){
       if(n===0) return {v:'0', label:'틀린 적 없음', sub:counts[0]+'개'};
       return {v:String(n), label:n+'번 틀림', sub:counts[n]+'개'};
@@ -1245,12 +1317,13 @@ function renderSheet(){
     + '<div class="grab"></div>'
     + '<div class="sheet-t"><h3>'+escapeHtml(title)+'</h3><button class="cancel" id="sheetClose">닫기</button></div>'
     + (opts.length ? opts.map(function(o){
-        return '<button class="opt'+(current===o.v?' on':'')+'" data-v="'+escapeHtml(o.v)+'">'
+        var on = multi ? (o.v ? picked.indexOf(o.v) > -1 : !picked.length) : current===o.v;
+        return '<button class="opt'+(on?' on':'')+'" data-v="'+escapeHtml(o.v)+'">'
           + '<span style="display:flex;align-items:center;gap:11px">'
           + (o.sw ? '<span style="display:flex;flex:none;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px var(--line-strong)">'
               + o.sw.map(function(c){ return '<span style="width:15px;height:24px;background:'+c+'"></span>'; }).join('') + '</span>' : '')
           + '<span>'+escapeHtml(o.label)+(o.sub?'<small>'+escapeHtml(o.sub)+'</small>':'')+'</span></span>'
-          + (current===o.v?'<span class="ck">✓</span>':'') + '</button>';
+          + (on?'<span class="ck">✓</span>':'') + '</button>';
       }).join('') : '<p class="note">고를 수 있는 항목이 없어요.</p>')
     + '</div></div>';
 
@@ -1259,14 +1332,14 @@ function renderSheet(){
   root.querySelectorAll('.opt').forEach(function(b){
     b.onclick = function(){
       var v = b.dataset.v;
-      if(kind==='list') state.setup.listId = v || null;
-      else if(kind==='dir') state.setup.dir = v;
+      if(kind==='list'){ toggleStudyList(v); render(); return; }
+      if(kind==='dir') state.setup.dir = v;
       else if(kind==='scope') state.setup.scope = v;
       else if(kind==='wrongN') state.setup.wrongN = parseInt(v,10);
       else if(kind==='theme'){ applyTheme(v); }
       if(kind==='scope' && v==='wrongN'){
         var cnt = {};
-        wordsInList(state.setup.listId).forEach(function(w){ var n=w.wrongCount||0; cnt[n]=(cnt[n]||0)+1; });
+        wordsInLists(picked).forEach(function(w){ var n=w.wrongCount||0; cnt[n]=(cnt[n]||0)+1; });
         var vals = Object.keys(cnt).map(Number).sort(function(a,b){return a-b;});
         if(vals.indexOf(state.setup.wrongN)===-1) state.setup.wrongN = vals.length ? vals[vals.length-1] : null;
         state.sheet = 'wrongN';
@@ -1277,6 +1350,55 @@ function renderSheet(){
       render();
     };
   });
+}
+
+/* ---------------- 분포 막대 → 학습 시트 ---------------- */
+// tier: 0~5 = 그 횟수만큼 틀린 단어, 'new' = 한 번도 안 본 단어
+function tierWords(tier){
+  return wordsInLists(studyListIds()).filter(function(w){
+    var fresh = !(w.wrongCount>0) && !(w.correctCount>0);
+    return tier==='new' ? fresh : (!fresh && clampWrong(w.wrongCount)===tier);
+  });
+}
+function tierLabel(tier){ return tier==='new' ? '아직 안 본 단어' : (tier===0 ? '안 틀린 단어' : tier+'번 틀린 단어'); }
+function openTierSheet(tier){
+  var n = tierWords(tier).length; if(!n) return;
+  state.tierSheet = { tier: tier, count: Math.min(state.setup.count > 0 ? state.setup.count : 20, n) };
+  openSheet('tier');
+}
+function renderTierSheet(root){
+  var t = state.tierSheet; if(!t){ state.sheet = null; root.innerHTML=''; return; }
+  var pool = tierWords(t.tier);
+  if(!pool.length){ state.sheet = null; state.tierSheet = null; root.innerHTML=''; return; }
+  if(t.count > pool.length) t.count = pool.length;
+  var unseen = pool.filter(function(w){ return !w.lastSeen; }).length;
+  var countOpts = [10,20,30,50].filter(function(n){ return n < pool.length; });
+  root.innerHTML = '<div class="back" id="sheetBack"><div class="sheet">'
+    + '<div class="grab"></div>'
+    + '<div class="sheet-t"><h3>'+escapeHtml(tierLabel(t.tier))+'</h3><button class="cancel" id="sheetClose">닫기</button></div>'
+    + '<div class="tier-sum"><b>'+pool.length+'</b>개 <span>'+escapeHtml(listsLabel(studyListIds()))+'</span>'
+    + '<div class="tier-sub">'+(unseen ? '이번 회차에 안 본 단어 '+unseen+'개부터 나와요' : '전부 한 번씩 봤어요. 오래전에 본 단어부터 나와요')+'</div></div>'
+    + '<div class="tier-k">방향</div><div class="chips left" id="tierDir">'
+    + DIRS.map(function(d){ return '<button class="chip kr'+(state.setup.dir===d.v?' on':'')+'" data-d="'+d.v+'">'+d.label+'</button>'; }).join('')
+    + '</div>'
+    + '<div class="tier-k">문제 수</div><div class="chips left" id="tierCount">'
+    + countOpts.map(function(n){ return '<button class="chip'+(t.count===n?' on':'')+'" data-n="'+n+'">'+n+'</button>'; }).join('')
+    + '<button class="chip kr'+(t.count===pool.length?' on':'')+'" data-n="'+pool.length+'">전체 '+pool.length+'</button>'
+    + '</div>'
+    + '<button class="pbtn" id="tierStart">'+t.count+'문제 학습 시작</button>'
+    + '</div></div>';
+  document.getElementById('sheetBack').onclick = function(e){ if(e.target.id==='sheetBack') closeSheet(); };
+  document.getElementById('sheetClose').onclick = closeSheet;
+  document.getElementById('tierDir').onclick = function(e){
+    var b = e.target.closest('[data-d]'); if(!b) return; state.setup.dir = b.dataset.d; render();
+  };
+  document.getElementById('tierCount').onclick = function(e){
+    var b = e.target.closest('[data-n]'); if(!b) return; t.count = parseInt(b.dataset.n,10); render();
+  };
+  document.getElementById('tierStart').onclick = function(){
+    state.sheet = null; state.tierSheet = null;
+    beginSession(pool, 'tier', t.count);
+  };
 }
 
 /* ---------------- study tab ---------------- */
@@ -1298,16 +1420,15 @@ function renderStudyTab(){
     return;
   }
 
-  if(state.setup.listId && !Store.lists.some(function(l){return l.id===state.setup.listId;})) state.setup.listId = null;
-
-  var scoped = wordsInList(state.setup.listId);
+  var picked = studyListIds();
+  var scoped = wordsInLists(picked);
   var wrongNCounts = {};
   scoped.forEach(function(w){ var n = w.wrongCount||0; wrongNCounts[n] = (wrongNCounts[n]||0)+1; });
   var wrongNValues = Object.keys(wrongNCounts).map(Number).sort(function(a,b){ return a-b; });
   if(state.setup.scope==='wrongN' && wrongNValues.indexOf(state.setup.wrongN)===-1){
     state.setup.wrongN = wrongNValues.length ? wrongNValues[wrongNValues.length-1] : null;
   }
-  var pool = scopeFilteredWords(state.setup.listId, state.setup.scope);
+  var pool = scopeFilteredWords(picked, state.setup.scope);
   if(state.setup.count > pool.length) state.setup.count = pool.length;
   if(state.setup.count <= 0 && pool.length) state.setup.count = Math.min(20, pool.length);
 
@@ -1315,16 +1436,45 @@ function renderStudyTab(){
   var perfect = scoped.filter(function(w){ return (w.wrongCount||0)===0 && (w.correctCount||0) > 0; }).length;
 
   var countOpts = [10,20,30,50].filter(function(n){ return n < pool.length; });
+  var unseenCount = pool.filter(function(w){ return !w.lastSeen; }).length;
+
+  var distHtml = (function(){
+    var dist = [0,0,0,0,0,0], fresh = 0;
+    scoped.forEach(function(w){
+      if(!(w.wrongCount>0) && !(w.correctCount>0)) fresh++;
+      else dist[clampWrong(w.wrongCount)]++;
+    });
+    var max = Math.max.apply(null, dist.concat([fresh])) || 1;
+    var freshCol = fresh ? '<button class="dist-col fresh" data-tier="new" aria-label="안 본 단어 '+fresh+'개 학습"><span class="dist-v">'+fresh+'</span>'
+      + '<span class="dist-track"><span class="dist-bar" style="height:'+Math.max(4, Math.round(fresh/max*100))+'%"></span></span>'
+      + '<span class="dist-k">미학습</span></button>' : '';
+    var listChips = '<div class="dist-lists" id="distLists">'
+      + '<button class="lchip'+(picked.length?'':' on')+'" data-l="">전체 <span class="c">'+Store.words.length+'</span></button>'
+      + Store.lists.map(function(l){
+          return '<button class="lchip'+(picked.indexOf(l.id)>-1?' on':'')+'" data-l="'+l.id+'">'+escapeHtml(l.name)+' <span class="c">'+wordsInList(l.id).length+'</span></button>';
+        }).join('')
+      + '</div>';
+    return '<div class="dist"><div class="setup-h"><div class="setup-title">틀린 횟수 분포</div><span class="dist-sub">'+scoped.length+'개 · 막대를 눌러 학습</span></div>'
+      + listChips
+      + '<div class="dist-cols" style="grid-template-columns:repeat('+(fresh?7:6)+',minmax(0,1fr))">' + freshCol + dist.map(function(c,n){
+          return '<button class="dist-col'+(c?'':' zero')+'" data-tier="'+n+'"'+(c?'':' disabled')+' aria-label="'+n+'번 틀린 단어 '+c+'개 학습">'
+            + '<span class="dist-v">'+c+'</span>'
+            + '<span class="dist-track"><span class="dist-bar heat-'+heatLevel(n)+'" style="height:'+(c ? Math.max(4, Math.round(c/max*100)) : 0)+'%"></span></span>'
+            + '<span class="dist-k">'+n+'번</span></button>';
+        }).join('') + '</div></div>';
+  })();
 
   var html = '<div class="statline">'
     + '<b>'+scoped.length+'</b><span>단어</span><span class="dot">·</span>'
     + '<span class="w">'+reviewCount+'</span><span>복습 필요</span><span class="dot">·</span>'
     + '<span class="g">'+perfect+'</span><span>완벽</span>'
     + '</div>'
-    + '<div class="wrap setup-outer"><div class="setup">'
+    + '<div class="wrap setup-outer">'
+    + distHtml
+    + '<div class="setup">'
     + '<div class="setup-h"><div class="setup-title">오늘 학습</div></div>'
     + '<button class="row" data-sheet="list"><span class="row-k">단어장</span><span class="row-v">'
-      + escapeHtml(state.setup.listId ? listName(state.setup.listId) : '전체')
+      + escapeHtml(listsLabel(picked))
       + ' <small>'+scoped.length+'개</small><i>›</i></span></button>'
     + '<button class="row" data-sheet="dir"><span class="row-k">방향</span><span class="row-v">'+dirLabel(state.setup.dir)+'<i>›</i></span></button>'
     + '<button class="row" data-sheet="scope"><span class="row-k">범위</span><span class="row-v">'+scopeLabel(state.setup.scope)+'<i>›</i></span></button>'
@@ -1338,27 +1488,9 @@ function renderStudyTab(){
       + (pool.length ? '<button class="chip kr'+(state.setup.count===pool.length?' on':'')+'" data-n="'+pool.length+'">전체</button>' : '')
       + '</span></div>'
     + '<div class="start-wrap"><button class="start" id="startBtn"'+(pool.length===0?' disabled':'')+'>'
-      + '<div class="n">'+(pool.length ? state.setup.count+'문제' : '학습할 단어 없음')+'</div>'
+      + '<div class="n">'+(pool.length ? state.setup.count+'문제'+(unseenCount ? ' · 안 본 단어 '+unseenCount+'개부터' : '') : '학습할 단어 없음')+'</div>'
       + '<div class="t">학습 시작</div></button></div>'
     + '</div>'
-    + (function(){
-        var dist = [0,0,0,0,0,0], fresh = 0;
-        scoped.forEach(function(w){
-          if(!(w.wrongCount>0) && !(w.correctCount>0)) fresh++;
-          else dist[clampWrong(w.wrongCount)]++;
-        });
-        var max = Math.max.apply(null, dist.concat([fresh])) || 1;
-        var freshCol = fresh ? '<div class="dist-col fresh"><span class="dist-v">'+fresh+'</span>'
-          + '<span class="dist-track"><span class="dist-bar" style="height:'+Math.max(4, Math.round(fresh/max*100))+'%"></span></span>'
-          + '<span class="dist-k">미학습</span></div>' : '';
-        return '<div class="dist"><div class="setup-h"><div class="setup-title">틀린 횟수 분포</div><span class="dist-sub">'+escapeHtml(state.setup.listId ? listName(state.setup.listId) : '전체')+' · '+scoped.length+'개</span></div>'
-          + '<div class="dist-cols" style="grid-template-columns:repeat('+(fresh?7:6)+',minmax(0,1fr))">' + freshCol + dist.map(function(c,n){
-              return '<div class="dist-col'+(c?'':' zero')+'">'
-                + '<span class="dist-v">'+c+'</span>'
-                + '<span class="dist-track"><span class="dist-bar heat-'+heatLevel(n)+'" style="height:'+(c ? Math.max(4, Math.round(c/max*100)) : 0)+'%"></span></span>'
-                + '<span class="dist-k">'+n+'번</span></div>';
-            }).join('') + '</div></div>';
-      })()
     + (pool.length===0 ? '<p class="note">'+(state.setup.scope==='new' ? '이미 전부 한 번 이상 학습했어요. 범위를 바꿔보세요.' : '이 조건에 맞는 단어가 없어요.')+'</p>' : '')
     + '</div>';
 
@@ -1366,6 +1498,13 @@ function renderStudyTab(){
 
   view.querySelectorAll('[data-sheet]').forEach(function(b){
     b.onclick = function(){ openSheet(b.dataset.sheet); };
+  });
+  document.getElementById('distLists').onclick = function(e){
+    var b = e.target.closest('[data-l]'); if(!b) return;
+    toggleStudyList(b.dataset.l); render();
+  };
+  view.querySelectorAll('.dist-col[data-tier]').forEach(function(b){
+    b.onclick = function(){ var v = b.dataset.tier; openTierSheet(v==='new' ? 'new' : parseInt(v,10)); };
   });
   var chips = document.getElementById('countChips');
   if(chips) chips.onclick = function(e){
@@ -1377,14 +1516,20 @@ function renderStudyTab(){
 }
 
 function startSession(){
-  var pool = scopeFilteredWords(state.setup.listId, state.setup.scope).slice();
-  pool = pool.map(function(w){ return [Math.random(), w]; }).sort(function(a,b){ return a[0]-b[0]; }).map(function(p){ return p[1]; });
-  if(state.setup.scope==='wrong'){
-    pool.sort(function(a,b){ return (b.wrongCount||0) - (a.wrongCount||0); });
-  } else if(state.setup.scope==='wrongLow'){
-    pool.sort(function(a,b){ return (a.wrongCount||0) - (b.wrongCount||0); });
+  beginSession(scopeFilteredWords(studyListIds(), state.setup.scope), state.setup.scope, state.setup.count);
+}
+function beginSession(source, scope, count){
+  var pool = source.map(function(w){ return [Math.random(), w]; }).sort(function(a,b){ return a[0]-b[0]; }).map(function(p){ return p[1]; });
+  // 같은 조건으로 여러 번 학습해도 겹치지 않게, 오래전에 본 단어부터 낸다 (랜덤 범위만 예외)
+  var seen = function(a,b){ return (a.lastSeen||0) - (b.lastSeen||0); };
+  if(scope==='wrong'){
+    pool.sort(function(a,b){ return ((b.wrongCount||0) - (a.wrongCount||0)) || seen(a,b); });
+  } else if(scope==='wrongLow'){
+    pool.sort(function(a,b){ return ((a.wrongCount||0) - (b.wrongCount||0)) || seen(a,b); });
+  } else if(scope!=='random'){
+    pool.sort(seen);
   }
-  pool = pool.slice(0, state.setup.count);
+  pool = pool.slice(0, count);
   var queue = pool.map(function(w){
     var dir = state.setup.dir;
     if(dir==='mixed') dir = Math.random()<0.5 ? 'en2ko' : 'ko2en';
@@ -1437,11 +1582,12 @@ function renderSession(){
         + '</div>'
       : '<div class="card front" id="cardFront">'+frontCardHtml(item, true)+'</div>')
     + '</div></div></div>'
-    + '<div class="grade"'+(s.revealed?'':' style="visibility:hidden"')+'>'
-    + '<button class="gbtn no" id="wrongBtn" title="땡 (←)">✕</button>'
-    + '<div class="ghint">← 땡 &nbsp;·&nbsp; 정답 →<br>카드를 밀어도 채점돼요</div>'
-    + '<button class="gbtn ok" id="rightBtn" title="정답 (→)">○</button>'
-    + '</div>';
+    + '<div class="grade3"'+(s.revealed?'':' style="visibility:hidden"')+'>'
+    + '<button class="g3 up" data-grade="up" title="틀린 횟수 올림 (←)"><span class="gbtn no">＋1</span><span class="g3l">← 올림</span></button>'
+    + '<button class="g3 down" data-grade="down" title="틀린 횟수 내림 (↓)"><span class="gbtn ok">－1</span><span class="g3l">↓ 내림</span></button>'
+    + '<button class="g3 hold" data-grade="keep" title="그대로 두기 (→)"><span class="gbtn hold">＝</span><span class="g3l">유지 →</span></button>'
+    + '</div>'
+    + (s.revealed ? '<div class="ghint">카드를 밀어도 채점돼요</div>' : '');
 
   view.innerHTML = html;
   document.getElementById('quitBtn').onclick = function(){ state.session = null; render(); };
@@ -1479,8 +1625,9 @@ function renderSession(){
     var hs = document.getElementById('hintSynBtn');
     if(hs) hs.onclick = function(e){ e.stopPropagation(); item.hintSyn = true; render(); };
   } else {
-    document.getElementById('wrongBtn').onclick = function(){ flingCard(swipeEl, false); };
-    document.getElementById('rightBtn').onclick = function(){ flingCard(swipeEl, true); };
+    view.querySelectorAll('.g3[data-grade]').forEach(function(b){
+      b.onclick = function(){ flingCard(swipeEl, b.dataset.grade); };
+    });
     bindSpeakables(view);
     prefetchTts(itemSpeakTexts(item).concat(itemSpeakTexts(s.queue[s.idx+1]), itemSpeakTexts(s.queue[s.idx+2])));
     enableSwipe(swipeEl, face);
@@ -1507,25 +1654,32 @@ function frontCardHtml(item, interactive){
     + '<div class="'+cls+'">'+escapeHtml(front)+'</div>'
     + hintsHtml
     + (hintBtns ? '<div class="hints">'+hintBtns+'</div>' : '')
-    + '<div class="reveal">탭 → 정답 · 밀어서 채점</div>';
+    + '<div class="reveal">탭 → 정답 · 밀어서 채점 (← 올림 · ↓ 내림 · → 유지)</div>';
 }
 
-function flingCard(card, correct){
+// kind: 'up' 틀린 횟수 +1 (왼쪽) · 'down' -1 (아래) · 'keep' 그대로 (오른쪽)
+var GRADE_FLING = {
+  up:   'translateX(-660px) rotate(-16deg)',
+  keep: 'translateX(660px) rotate(16deg)',
+  down: 'translateY(900px) rotate(-3deg)'
+};
+var GRADE_TINT = { up:'var(--danger)', down:'var(--mint)', keep:'var(--ink-2)' };
+function flingCard(card, kind){
   if(!card || card.dataset.flinging) return;
   card.dataset.flinging = '1';
-  var ghost = document.getElementById('ghostEl');
-  tintCard(document.getElementById('cardBack'), correct ? 1 : -1, true);
+  tintCard(document.getElementById('cardBack'), kind, 1, true);
   card.style.transition = 'transform .72s cubic-bezier(.36,.62,.4,1), opacity .72s ease';
-  card.style.transform = 'translateX('+(correct?660:-660)+'px) rotate('+(correct?16:-16)+'deg)';
+  card.style.transform = GRADE_FLING[kind];
   card.style.opacity = '0';
-  setTimeout(function(){ gradeCard(correct); }, 330);
+  setTimeout(function(){ gradeCard(kind); }, 330);
 }
 
-function tintCard(el, v, animate){
+function tintCard(el, kind, v, animate){
   if(!el) return;
   el.style.transition = animate ? 'border-color .2s ease, box-shadow .2s ease' : 'none';
-  if(!v){ el.style.borderColor = ''; el.style.boxShadow = ''; return; }
-  var c = v > 0 ? 'var(--mint)' : 'var(--danger)', p = Math.round(Math.abs(v)*100);
+  if(!kind || !v){ el.style.borderColor = ''; el.style.boxShadow = ''; return; }
+  v = Math.min(1, v);
+  var c = GRADE_TINT[kind], p = Math.round(Math.abs(v)*100);
   el.style.borderColor = 'color-mix(in srgb, '+c+' '+p+'%, var(--line-strong))';
   el.style.boxShadow = 'inset 0 0 0 '+(Math.abs(v)*2.5).toFixed(2)+'px color-mix(in srgb, '+c+' '+p+'%, transparent), 0 0 '+Math.round(Math.abs(v)*28)+'px color-mix(in srgb, '+c+' '+Math.round(p*.35)+'%, transparent), var(--shadow-1)';
 }
@@ -1545,21 +1699,30 @@ function enableSwipe(card, scrollFace){
     dx = t.clientX - x0; dy = t.clientY - y0;
     if(axis===null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)){
       var canScroll = scrollFace && scrollFace.classList.contains('scrolly');
-      axis = (Math.abs(dx) > Math.abs(dy) * 1.2 || !canScroll) ? 'x' : 'y';
+      if(Math.abs(dx) > Math.abs(dy) * 1.2) axis = 'x';
+      // 아래로 당기기: 카드가 스크롤 중이 아닐 때만 '내림'으로 받는다
+      else if(dy > 0 && (!canScroll || scrollFace.scrollTop <= 0)) axis = 'down';
+      else axis = canScroll ? 'y' : 'x';
     }
-    if(axis !== 'x') return;
-    if(e.cancelable) e.preventDefault();
-    card.style.transform = 'translateX('+dx+'px) rotate('+(dx/30)+'deg)';
-    tintCard(back, Math.abs(dx) < 8 ? 0 : Math.max(-1, Math.min(1, dx/100)), false);
+    if(axis === 'x'){
+      if(e.cancelable) e.preventDefault();
+      card.style.transform = 'translateX('+dx+'px) rotate('+(dx/30)+'deg)';
+      tintCard(back, dx < 0 ? 'up' : 'keep', Math.abs(dx) < 8 ? 0 : Math.abs(dx)/100, false);
+    } else if(axis === 'down'){
+      if(e.cancelable) e.preventDefault();
+      var y = Math.max(0, dy);
+      card.style.transform = 'translateY('+y+'px) rotate('+(-y/90)+'deg)';
+      tintCard(back, 'down', y < 8 ? 0 : y/120, false);
+    }
   }
   function up(){
     if(!dragging) return;
     dragging = false; x0 = null; y0 = null;
-    if(axis !== 'x'){ card.style.transform = ''; return; }
-    if(Math.abs(dx) > 84){ flingCard(card, dx > 0); return; }
+    if(axis === 'x' && Math.abs(dx) > 84){ flingCard(card, dx < 0 ? 'up' : 'keep'); return; }
+    if(axis === 'down' && dy > 110){ flingCard(card, 'down'); return; }
     card.style.transition = 'transform .2s ease, opacity .2s ease';
     card.style.transform = '';
-    tintCard(back, 0, true);
+    tintCard(back, '', 0, true);
   }
   card.addEventListener('mousedown', down);
   card.addEventListener('touchstart', down, {passive:true});
@@ -1579,17 +1742,26 @@ document.addEventListener('keydown', function(e){
     return;
   }
   var cardEl = document.getElementById('swipeEl');
-  if(e.key==='ArrowRight'){ e.preventDefault(); flingCard(cardEl, true); }
-  else if(e.key==='ArrowLeft'){ e.preventDefault(); flingCard(cardEl, false); }
+  if(e.key==='ArrowRight'){ e.preventDefault(); flingCard(cardEl, 'keep'); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); flingCard(cardEl, 'up'); }
+  else if(e.key==='ArrowDown'){ e.preventDefault(); flingCard(cardEl, 'down'); }
 });
 
-function gradeCard(correct){
+function gradeCard(kind){
   var s = state.session;
   if(!s || s.idx >= s.queue.length) return;
   var item = s.queue[s.idx];
   var live = currentWordLive(item.id);
-  if(!s.noCount) Store.update(item.id, correct ? { correctCount: (live.correctCount||0) + 1 } : { wrongCount: clampWrong((live.wrongCount||0) + 1) });
-  s.results.push({ id:item.id, word:item.word, meaning:item.meaning, correct: correct });
+  if(!s.noCount){
+    var patch = { lastSeen: Date.now() };
+    if(kind==='up') patch.wrongCount = clampWrong((live.wrongCount||0) + 1);
+    else {
+      patch.correctCount = (live.correctCount||0) + 1;
+      if(kind==='down') patch.wrongCount = clampWrong((live.wrongCount||0) - 1);
+    }
+    Store.update(item.id, patch);
+  }
+  s.results.push({ id:item.id, word:item.word, meaning:item.meaning, kind: kind, correct: kind!=='up' });
   s.idx += 1;
   s.revealed = false;
   s.entering = true;
@@ -1601,14 +1773,17 @@ function renderSummary(){
   var total = s.results.length;
   var right = s.results.filter(function(r){return r.correct;}).length;
   var missed = s.results.filter(function(r){return !r.correct;});
+  var cnt = { up:0, down:0, keep:0 };
+  s.results.forEach(function(r){ cnt[r.kind || (r.correct ? 'keep' : 'up')]++; });
 
   var html = '<div class="sum">'
     + '<div class="sum-big"><div class="n">'+right+'</div><div class="d">/ '+total+'</div></div>'
     + '<div class="sum-t">'+(right===total ? '전부 맞혔어요!' : '좋아요, '+right+'개 맞혔어요')+'</div>'
-    + '<div class="sum-s">'+(s.noCount ? '복습 모드 · 틀린 횟수에 반영되지 않아요' : missed.length ? '틀린 '+missed.length+'개는 다음 복습에서 먼저 나와요' : '이 세션에서 틀린 단어가 없어요')+'</div>';
+    + '<div class="sum-split"><span class="w">올림 <b>'+cnt.up+'</b></span><span class="g">내림 <b>'+cnt.down+'</b></span><span>유지 <b>'+cnt.keep+'</b></span></div>'
+    + '<div class="sum-s">'+(s.noCount ? '복습 모드 · 틀린 횟수에 반영되지 않아요' : '같은 조건으로 다시 시작하면 이번에 안 본 단어부터 나와요')+'</div>';
 
   if(missed.length){
-    html += '<div class="miss"><div class="hl">틀린 단어</div>'
+    html += '<div class="miss"><div class="hl">틀린 단어 (올림)</div>'
       + missed.map(function(r){ return '<div class="miss-row"><b>'+escapeHtml(r.word)+'</b><span>'+escapeHtml(r.meaning)+'</span></div>'; }).join('')
       + '</div>'
       + '<button class="pbtn" id="retryBtn">틀린 '+missed.length+'개 바로 다시</button>';
@@ -2053,7 +2228,7 @@ function renderListModal(){
       Store.deleteList(id, cnt>0);
       state.listDeleteArmed = null;
       if(state.bank.listId===id) state.bank.listId = null;
-      if(state.setup.listId===id) state.setup.listId = null;
+      state.setup.listIds = state.setup.listIds.filter(function(x){ return x!==id; }); saveStudyLists();
       render();
     });
   });
