@@ -517,7 +517,8 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .lpick-none{font-size:12.5px;color:var(--faint);text-align:center;padding:14px 0;margin:0}
 .lpick-done{margin-top:8px;padding:12px}
 /* 막대 말풍선: 누른 막대에서 튀어나온다 (--cx = 꼬리 위치) */
-.tpop{--cx:50%;position:relative;z-index:5;margin-top:12px;background:var(--raised);border:1.5px solid var(--mint);border-radius:16px;box-shadow:var(--shadow-2);padding:14px 16px 16px;transform-origin:var(--cx) 0}
+.tpop-anchor{position:relative;height:0;z-index:20}
+.tpop{--cx:50%;position:absolute;top:12px;left:0;right:0;z-index:20;background:var(--raised);border:1.5px solid var(--mint);border-radius:16px;box-shadow:var(--shadow-2);padding:14px 16px 16px;transform-origin:var(--cx) 0}
 .tpop-car{position:absolute;top:-8.5px;left:calc(var(--cx) - 7px);width:14px;height:14px;background:var(--raised);border-top:1.5px solid var(--mint);border-left:1.5px solid var(--mint);transform:rotate(45deg)}
 .tpop.anim{animation:bubbleIn .32s cubic-bezier(.2,.9,.3,1.18) both}
 .tpop.closing{animation:bubbleOut .15s ease-in forwards;pointer-events:none}
@@ -1479,7 +1480,8 @@ function tierPopHtml(){
   if(t.count > pool.length) t.count = pool.length;
   var unseen = pool.filter(function(w){ return !w.lastSeen; }).length;
   var countOpts = [10,20,30,50].filter(function(n){ return n < pool.length; });
-  return '<div class="tpop'+(t.anim?' anim':'')+'" id="tpop"><i class="tpop-car" aria-hidden="true"></i>'
+  // 높이 0인 기준점 안에 띄워서, 아래 "오늘 학습" 카드를 밀어내지 않고 그 위에 겹친다
+  return '<div class="tpop-anchor"><div class="tpop'+(t.anim?' anim':'')+'" id="tpop"><i class="tpop-car" aria-hidden="true"></i>'
     + '<div class="tpop-h"><div class="tpop-t">'+escapeHtml(tierLabel(t.tier))+' <b>'+pool.length+'</b>개</div><button class="tpop-x" id="tpopClose">닫기</button></div>'
     + '<div class="tpop-sub">'+escapeHtml(listsLabel(studyListIds()))+' · '+(unseen ? '이번 회차에 안 본 단어 '+unseen+'개부터' : '오래전에 본 단어부터')+'</div>'
     + '<div class="chips left" id="tierDir">'
@@ -1490,7 +1492,7 @@ function tierPopHtml(){
     + '<button class="chip kr'+(t.count===pool.length?' on':'')+'" data-n="'+pool.length+'">전체 '+pool.length+'</button>'
     + '</div>'
     + '<button class="pbtn" id="tierStart">'+t.count+'문제 학습 시작</button>'
-    + '</div>';
+    + '</div></div>';
 }
 // 오버레이 바깥을 누르면 닫는다
 document.addEventListener('click', function(e){
