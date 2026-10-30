@@ -497,15 +497,28 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 /* 버튼 아래에서 위→아래로 펼쳐지듯: 위쪽부터 잘라내던 영역을 아래로 넓히고, 내용은 살짝 따라 내려온다 */
 .lpick-pop.anim{animation:dropIn .34s cubic-bezier(.22,.9,.3,1) both}
 .lpick-pop.anim>*{animation:dropItem .34s cubic-bezier(.22,.9,.3,1) both}
-.lpick-pop.closing{animation:dropOut .2s cubic-bezier(.5,0,.75,0) forwards;pointer-events:none}
+.lpick-pop.closing{animation:dropOut .3s cubic-bezier(.4,0,.3,1) forwards;pointer-events:none}
+.lpick-pop.closing>*{animation:dropItemOut .3s cubic-bezier(.4,0,.3,1) forwards}
 @keyframes dropIn{from{clip-path:inset(0 -20px 100% -20px);opacity:.6}to{clip-path:inset(0 -20px -40px -20px);opacity:1}}
 @keyframes dropItem{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
-@keyframes dropOut{from{clip-path:inset(0 -20px -40px -20px)}to{clip-path:inset(0 -20px 100% -20px);opacity:.4}}
+@keyframes dropOut{from{clip-path:inset(0 -20px -40px -20px)}to{clip-path:inset(0 -20px 100% -20px)}}
+@keyframes dropItemOut{to{opacity:0;transform:translateY(-18px)}}
 .lpick-search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:0 10px;color:var(--muted)}
 .lpick-search input{flex:1;min-width:0;background:none;border:none;color:var(--ink);padding:9px 0;outline:none;font-family:inherit}
-.lpick-sum{display:flex;align-items:center;justify-content:space-between;margin:10px 2px 4px;font-size:11.5px;color:var(--muted)}
+.lpick-sec{display:flex;align-items:center;justify-content:space-between;min-height:22px;margin:0 2px 6px;font-size:11.5px;color:var(--muted)}
+.lpick-sec b{font-family:var(--f-mono);color:var(--mint)}
+.lpick-sec.all{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.lpick-sel{display:flex;flex-wrap:wrap;gap:6px;max-height:76px;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.lpick-chip{display:flex;align-items:center;gap:6px;max-width:100%;background:var(--mint-soft);border:none;border-radius:999px;padding:6px 10px 6px 12px;color:var(--mint-ink);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.lpick-chip .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lpick-chip .c{font-family:var(--f-mono);font-size:11px;opacity:.7}
+.lpick-chip i{font-style:normal;font-size:10px;opacity:.7}
+.lpick-chip.just{animation:chipIn .26s cubic-bezier(.3,1.5,.5,1)}
+@keyframes chipIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+.lpick-empty{margin:0;padding:3px 0 4px;font-size:12.5px;color:var(--faint)}
 .lpick-all{background:none;border:none;color:var(--mint);font-size:12px;font-weight:600;cursor:pointer;padding:4px 0;font-family:inherit}
-.lpick-list{max-height:min(44vh,320px);overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}
+.lpick-search+.lpick-list{margin-top:4px}
+.lpick-list{max-height:min(34vh,260px);overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}
 .lpick-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;border-top:1px solid var(--line-soft);padding:11px 2px;color:var(--ink);font-family:inherit;font-size:14px;text-align:left;cursor:pointer;transition:color .15s ease}
 .lpick-row .box{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-strong);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--on-mint);transition:background-color .15s ease,border-color .15s ease}
 .lpick-row.on{color:var(--mint);font-weight:700}
@@ -533,7 +546,7 @@ a{color:var(--mint);text-decoration:none}a:hover{color:var(--mint-ink)}
 .tpop .chips+.chips{margin-top:8px}
 .tpop .chip{padding:7px 12px}
 .tpop .pbtn{margin-top:14px;padding:13px}
-@media (prefers-reduced-motion:reduce){.lpick-pop.anim,.lpick-pop.anim>*,.lpick-pop.closing,.tpop.anim,.tpop.closing,.lpick-row.just .box,.dist-col.on::after{animation:none !important}}
+@media (prefers-reduced-motion:reduce){.lpick-pop.anim,.lpick-pop.anim>*,.lpick-pop.closing,.lpick-pop.closing>*,.lpick-chip.just,.tpop.anim,.tpop.closing,.lpick-row.just .box,.dist-col.on::after{animation:none !important}}
 .sum-split{display:flex;gap:14px;margin-top:10px;font-size:13px;color:var(--muted)}
 .sum-split b{font-family:var(--f-mono);color:var(--ink)}
 .sum-split .w b{color:var(--danger)}
@@ -1442,7 +1455,7 @@ function closeOverlay(kind, after){
   if(kind==='list'){ var b = view.querySelector('.lpick-btn'); if(b) b.classList.remove('open'); }
   else { var c = view.querySelector('.dist-col.on'); if(c) c.classList.remove('on'); }
   var dim = view.querySelector('.setup.dim'); if(dim) dim.classList.remove('dim');
-  setTimeout(done, kind==='list' ? 200 : 160);
+  setTimeout(done, kind==='list' ? 300 : 160);
 }
 function listPickHtml(picked){
   var lp = state.listPick, open = !!lp;
@@ -1453,9 +1466,12 @@ function listPickHtml(picked){
     + '<span class="lpick-car" aria-hidden="true">▾</span></button>';
   if(open){
     var q = (lp.q||'').trim().toLowerCase(), shown = 0;
-    // 고른 단어장을 위로
-    var rows = Store.lists.slice().sort(function(a,b){ return (picked.indexOf(b.id)>-1) - (picked.indexOf(a.id)>-1); });
-    var rowsHtml = rows.map(function(l){
+    // 고른 단어장은 위쪽 칸에 따로 모으고, 아래 목록은 순서를 고정해 자리가 바뀌지 않게 한다
+    var selHtml = picked.length ? picked.map(function(id){
+      return '<button class="lpick-chip'+(lp.just===id?' just':'')+'" data-rm="'+id+'" aria-label="'+escapeHtml(listName(id))+' 선택 해제">'
+        + '<span class="nm">'+escapeHtml(listName(id))+'</span><span class="c">'+wordsInList(id).length+'</span><i aria-hidden="true">✕</i></button>';
+    }).join('') : '<p class="lpick-empty">고르지 않으면 전체 단어로 학습해요</p>';
+    var rowsHtml = Store.lists.map(function(l){
       var on = picked.indexOf(l.id) > -1;
       var hide = q && l.name.toLowerCase().indexOf(q)===-1;
       if(!hide) shown++;
@@ -1463,9 +1479,11 @@ function listPickHtml(picked){
         + '<span class="box" aria-hidden="true">'+(on?'✓':'')+'</span><span class="nm">'+escapeHtml(l.name)+'</span><span class="c">'+wordsInList(l.id).length+'</span></button>';
     }).join('');
     html += '<div class="lpick-pop'+(lp.anim?' anim':'')+'">'
-      + '<label class="lpick-search"><span aria-hidden="true">⌕</span><input type="text" id="lpickQ" placeholder="단어장 이름 검색" aria-label="단어장 이름 검색" value="'+escapeHtml(lp.q||'')+'"></label>'
-      + '<div class="lpick-sum"><span>'+(picked.length ? picked.length+'개 선택' : '전체')+' · 단어 '+total+'개</span>'
+      + '<div class="lpick-sec"><span>선택한 단어장'+(picked.length ? ' <b>'+picked.length+'</b>개 · 단어 '+total+'개' : '')+'</span>'
       + (picked.length ? '<button class="lpick-all" id="lpickAll">전체로 보기</button>' : '')+'</div>'
+      + '<div class="lpick-sel" id="lpickSel">'+selHtml+'</div>'
+      + '<div class="lpick-sec all"><span>모든 단어장</span></div>'
+      + '<label class="lpick-search"><span aria-hidden="true">⌕</span><input type="text" id="lpickQ" placeholder="단어장 이름 검색" aria-label="단어장 이름 검색" value="'+escapeHtml(lp.q||'')+'"></label>'
       + '<div class="lpick-list" id="lpickList">'+rowsHtml
       + '<p class="lpick-none"'+(shown?' hidden':'')+'>검색 결과가 없어요</p></div>'
       + '<button class="pbtn lpick-done" id="lpickDone">완료</button>'
@@ -1602,6 +1620,10 @@ function renderStudyTab(){
       var r = e.target.closest('[data-l]'); if(!r) return;
       lp.scroll = listEl.scrollTop; lp.just = r.dataset.l;
       toggleStudyList(r.dataset.l); render();
+    };
+    document.getElementById('lpickSel').onclick = function(e){
+      var c = e.target.closest('[data-rm]'); if(!c) return;
+      lp.scroll = listEl.scrollTop; toggleStudyList(c.dataset.rm); render();
     };
     var allBtn = document.getElementById('lpickAll');
     if(allBtn) allBtn.onclick = function(){ lp.scroll = listEl.scrollTop; toggleStudyList(''); render(); };
@@ -1797,7 +1819,7 @@ var GRADE_FLING = {
   keep: 'translateX(660px) rotate(16deg)',
   down: 'translateY(900px) rotate(-3deg)'
 };
-var GRADE_TINT = { up:'var(--danger)', down:'var(--mint)', keep:'var(--ink-2)' };
+var GRADE_TINT = { up:'var(--danger)', down:'var(--ink-2)', keep:'var(--mint)' };
 function flingCard(card, kind){
   if(!card || card.dataset.flinging) return;
   card.dataset.flinging = '1';
