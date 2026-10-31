@@ -687,7 +687,11 @@ document.addEventListener('pointerdown', function(){
   }catch(e){}
 }, true);
 var ttsBlobUrl = {}, ttsPending = {};
-function ttsNorm(t){ return String(t||'').trim().slice(0,400); }
+// 단어만 보내면 끝음이 올라가므로, 평서문처럼 내려 읽도록 마침표를 붙인다
+function ttsNorm(t){
+  var s = String(t||'').trim().slice(0,399);
+  return s && !/[.!?…]["')\]]*$/.test(s) ? s+'.' : s;
+}
 async function ttsHash(s){
   var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
